@@ -1,65 +1,21 @@
 
-import { GraphQLFileLoader } from "@graphql-tools/graphql-file-loader";
-import { loadSchema } from "@graphql-tools/load";
 import axios from "axios";
-import { defaultFieldResolver, DocumentNode, graphql, GraphQLResolveInfo, GraphQLSchema, isListType, isNonNullType, isScalarType, print, Source } from "graphql";
+import { defaultFieldResolver, GraphQLResolveInfo, isListType, isNonNullType, isScalarType } from "graphql";
 import { GraphQLField, GraphQLOutputType } from "graphql/type/definition.js";
 import { DataFactory, Parser, Quad, Store } from "n3";
 
 import { Context } from "./context.js";
-import { ShaclParserService } from "./shacl-parser.service.js";
 import { RDFS } from "./vocab.js";
 
 const { namedNode } = DataFactory;
 
-
-type Requester <C = {}, E = unknown> =  <R, V>(doc: DocumentNode, vars?: V, options?: C) => Promise<R> | AsyncIterable<R>;
-
-
-export class LegacySdxClient {
-    private parser = new ShaclParserService();
-
-    constructor(private podLocation: string) { }
-
-    request: Requester<{}> = async <R, V>(doc: DocumentNode, vars?: V, options?: {}): Promise<R> => {
-        const query = print(doc);
-        const schema = await this.getSchema();
-        // const schema = await loadSchema('.sdx/graphql/schema.graphqls', { loaders: [new GraphQLFileLoader()],  })
-        
-        // console.log(schema)
-
-
-        console.log(query);
-        console.log(vars);
-        console.log(this.podLocation);
-
-        const result = await graphql({
-            source: query,
-            variableValues: vars!,
-            schema,
-            fieldResolver: this.fieldResolver(this.podLocation)
-        });
-        console.log(result.errors)
-        return result.data as R;
-    };
-
-    private async getSchema(): Promise<GraphQLSchema> {
-        // FIXME: Temporary workaround: reparsing from SHACL, as not to loose directives info
-        return await this.parser.parseSHACL('.sdx/shacl');
-        // return new GraphQLSchema({});
-    }
-
-    async query<T>(query: string, location?: string): Promise<T> {
-        const schema = await this.getSchema();
-        const result = await graphql({
-            source: query,
-            schema,
-            fieldResolver: this.fieldResolver(location ?? this.podLocation)
-        });
-        return result.data as T;
-    }
-
-    private fieldResolver = <TArgs>(location: string) => async (source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo): Promise<unknown> => {
+/**
+ * Field resolver for legacy PODs.
+ * @param location Location of the root graph.
+ * @returns 
+ */
+export function fieldResolver<TArgs>(location: string) {
+    return async (source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo): Promise<unknown> => {
         const { returnType, schema, fieldName, parentType, fieldNodes, path, rootValue } = info;
         const rootTypes = [
             schema.getQueryType()?.name,
@@ -136,9 +92,9 @@ export class LegacySdxClient {
 
             }
         }
-    };
+    }
+};
 
-}
 
 async function getSubGraphArray(source: Quad[], className: string, args: Record<string, any>): Promise<Quad[][]> {
     const store = new Store(source);
@@ -155,7 +111,7 @@ async function getSubGraph(source: Quad[], className: string, args: Record<strin
 
     // TODO: only id filter support
     const id = args?.id;
-    console.log(args)
+    // console.log(args)
     // if (id) { console.log('ARG ID:', id); };
     // printQuads(store);
     let topQuads = store.getSubjects(RDFS.a, namedNode(className), null).flatMap(sub => store.getQuads(sub, null, null, null));
@@ -181,7 +137,7 @@ async function getSubGraph(source: Quad[], className: string, args: Record<strin
 
 async function getGraph(location: string): Promise<Quad[]> {
     const doc = await axios.get(location);
-    console.log(doc.data)
+    // console.log(doc.data)
     return new Parser().parse(doc.data);
 }
 
@@ -205,16 +161,3 @@ function getDirectives(type: GraphQLOutputType | GraphQLField<any, any, any>): R
     }
     return isScalarType(type) ? {} : type.extensions.directives ?? {};
 }
-
-
-
-// // function followBlankNodes(store: Store, blankNode: BlankNode): Quad[] {
-// //     return store.getQuads(blankNode, null, null, null).flatMap(quad => quad.object.termType === 'BlankNode');
-// // }
-// function findTypeInSchema(schema: GraphQLSchema, type: GraphQLOutputType): GraphQLOutputType {
-//     const type = schema.getType(typeName);
-//     if (!type || !isOutputType(type)) {
-//         throw new Error(`${typeName} is not a valid GraphQLOutputType for this schema.`);
-//     }
-//     return type;
-// }

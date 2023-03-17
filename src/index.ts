@@ -1,4 +1,4 @@
 // Polyfills
 import "./polyfills.js";
 
-export { SdxClient } from "./sdx-client.js"
+export { legacyRequester, dynamicSdkClient } from "./sdx-client"

@@ -1,14 +1,12 @@
-import { DocumentNode } from 'graphql';
+import { GraphQLResolveInfo } from 'graphql';
+import { Quad } from 'n3';
+import { C as Context } from './context-dae7af42.js';
 
-type Requester<C = {}, E = unknown> = <R, V>(doc: DocumentNode, vars?: V, options?: C) => Promise<R> | AsyncIterable<R>;
-declare class LegacySdxClient {
-    private podLocation;
-    private parser;
-    constructor(podLocation: string);
-    request: Requester<{}>;
-    private getSchema;
-    query<T>(query: string, location?: string): Promise<T>;
-    private fieldResolver;
-}
+/**
+ * Field resolver for legacy PODs.
+ * @param location Location of the root graph.
+ * @returns
+ */
+declare function fieldResolver<TArgs>(location: string): (source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo) => Promise<unknown>;
 
-export { LegacySdxClient };
+export { fieldResolver };

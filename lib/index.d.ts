@@ -1,3 +1,3 @@
-export { SdxClient } from './sdx-client.js';
-import './legacy-sdx-client.js';
+export { dynamicSdkClient, legacyRequester } from './sdx-client.js';
+import 'graphql/jsutils/ObjMap.js';
 import 'graphql';
