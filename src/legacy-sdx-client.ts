@@ -1,7 +1,6 @@
 
 import axios from "axios";
-import { defaultFieldResolver, GraphQLResolveInfo, isListType, isNonNullType, isScalarType } from "graphql";
-import { GraphQLField, GraphQLOutputType } from "graphql/type/definition.js";
+import { defaultFieldResolver, GraphQLField, GraphQLOutputType, GraphQLResolveInfo, isListType, isNonNullType, isScalarType } from "graphql";
 import { DataFactory, Parser, Quad, Store } from "n3";
 
 import { Context } from "./context.js";

@@ -1,5 +1,4 @@
-import { GraphQLObjectType, GraphQLType } from "graphql";
-import * as Scalars from "graphql/type/scalars.js";
+import { GraphQLObjectType, GraphQLType, GraphQLFloat, GraphQLInt, GraphQLString } from "graphql";
 import { DataFactory, NamedNode, Quad, Store } from "n3";
 import { Context } from "../context.js";
 import { parseNameFromUri } from "../util.js";
@@ -52,17 +51,17 @@ export class PropertyShape {
     private dataTypeToGraphQLType(datatype?: string): GraphQLType | undefined {
         switch (datatype) {
             case XSD.int.value:
-                return Scalars.GraphQLInt;
+                return GraphQLInt;
 
             case XSD.float.value:
-                return Scalars.GraphQLFloat;
+                return GraphQLFloat;
 
             case RDFS.langString.value:
             case XSD.string.value:
-                return Scalars.GraphQLString;
+                return GraphQLString;
 
             case XSD.boolean.value:
-                return Scalars.GraphQLFloat;
+                return GraphQLFloat;
 
             default:
                 return undefined;

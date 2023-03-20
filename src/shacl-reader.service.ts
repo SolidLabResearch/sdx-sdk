@@ -1,10 +1,5 @@
-import { PathLike } from "fs";
-import { readFile, readdir, lstat, } from "fs/promises";
-import { GraphQLObjectType, GraphQLSchema } from "graphql";
-import { DirectiveLocation } from "graphql/language/directiveLocation.js";
-import { GraphQLFieldConfig, GraphQLList, GraphQLNonNull, GraphQLObjectTypeConfig, GraphQLType } from "graphql/type/definition.js";
-import { GraphQLDirective } from "graphql/type/directives.js";
-import * as Scalars from "graphql/type/scalars.js";
+import axios from 'axios';
+import { DirectiveLocation, GraphQLDirective, GraphQLFieldConfig, GraphQLID, GraphQLList, GraphQLNonNull, GraphQLObjectType, GraphQLObjectTypeConfig, GraphQLSchema, GraphQLString, GraphQLType } from "graphql";
 import { DataFactory, Parser, Quad } from 'n3';
 import { autoInjectable, singleton } from "tsyringe";
 import { Context } from './context.js';
@@ -16,7 +11,7 @@ const { namedNode } = DataFactory;
 const ID_FIELD: { 'id': GraphQLFieldConfig<any, any> } = {
     id: {
         description: 'Auto-generated property that will be assigned to the `iri` of the Thing that is being queried.',
-        type: new GraphQLNonNull(Scalars.GraphQLID),
+        type: new GraphQLNonNull(GraphQLID),
         extensions: {
             directives: {
                 'identifier': {}
@@ -32,47 +27,51 @@ const IDENTIFIER_DIRECTIVE = new GraphQLDirective({
 
 const IS_DIRECTIVE = new GraphQLDirective({
     name: 'is',
-    args: { class: { type: Scalars.GraphQLString } },
+    args: { class: { type: GraphQLString } },
     locations: [DirectiveLocation.OBJECT],
 
 });
 
 const PROPERTY_DIRECTIVE = new GraphQLDirective({
     name: 'property',
-    args: { iri: { type: Scalars.GraphQLString } },
+    args: { iri: { type: GraphQLString } },
     locations: [DirectiveLocation.FIELD_DEFINITION]
 })
 
 @singleton()
 @autoInjectable()
-export class ShaclParserService {
+export class ShaclReaderService {
     private parser: Parser;
+    private _cache: Quad[] = [];
+    primed = false;
 
     constructor() {
         this.parser = new Parser({ format: 'turtle' });
     }
 
-    async parseSHACL(path: PathLike): Promise<GraphQLSchema> {
-        const stat = await lstat(path);
-        if (stat.isDirectory() && (await (readdir(path))).length === 0) {
-            throw ERROR.NO_SHACL_SCHEMAS;
-        }
 
-        const parsePath = async (pathLike: PathLike): Promise<Quad[]> => {
-            const stat = await lstat(pathLike);
-            let quads: Quad[] = [];
-            if (stat.isDirectory()) {
-                for (const fileName of await readdir(pathLike)) {
-                    quads.push(... await parsePath(`${pathLike}/${fileName}`));
-                }
-            } else {
-                const source = await readFile(pathLike);
-                quads.push(... this.parser.parse(source.toString()))
-            }
-            return quads;
-        }
 
-        const context = new Context(await parsePath(path), this.generateObjectType);
+    async primeCache(uri: string) {
+        const response = await axios.get<{ entries: string[] }>(uri + '/index.json');
+        this._cache = [];
+        for (let entry of response.data.entries) {
+            const txt = await axios.get(uri + '/' + entry);
+            this._cache.push(...this.parser.parse(txt.data));
+        }
+        this.primed = true;
+    }
+
+
+    async parseSHACLs(uri: string): Promise<GraphQLSchema> {
+        // const response = await axios.get<{ entries: string[] }>(uri + '/index.json');
+        // const quads: Quad[] = [];
+        // for (let entry of response.data.entries) {
+        //     const txt = await axios.get(uri + '/' + entry);
+        //     quads.push(...this.parser.parse(txt.data));
+        // }
+        
+
+        const context = new Context(this._cache, this.generateObjectType);
 
         // Generate Schema
         return new GraphQLSchema({
@@ -96,7 +95,7 @@ export class ShaclParserService {
                 // Singular type
                 [decapitalize(type.name)]: {
                     type,
-                    args: { id: { type: Scalars.GraphQLString } }
+                    args: { id: { type: GraphQLString } }
                 },
                 // Multiple types
                 [plural(decapitalize(type.name))]: {

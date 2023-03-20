@@ -1,10 +1,12 @@
-import { PathLike } from 'fs';
 import { GraphQLSchema } from 'graphql';
 
-declare class ShaclParserService {
+declare class ShaclReaderService {
     private parser;
+    private _cache;
+    primed: boolean;
     constructor();
-    parseSHACL(path: PathLike): Promise<GraphQLSchema>;
+    primeCache(uri: string): Promise<void>;
+    parseSHACLs(uri: string): Promise<GraphQLSchema>;
     /**
      * Generates the entry points for the GraphQL Query schema
      * @param types
@@ -19,4 +21,4 @@ declare class ShaclParserService {
     private generateObjectType;
 }
 
-export { ShaclParserService };
+export { ShaclReaderService };

@@ -1,5 +1,4 @@
 import { Quad, Quad_Subject, Store } from "n3";
-import { isArray } from "util";
 
 export function parseNameFromUri(uriString: string): string {
     const uri = new URL(uriString);
@@ -22,6 +21,6 @@ export function printQuads(quads: Quad[] | Store, label?: string) {
     if (label) {
         console.log(`${label} ==> `)
     }
-    let q = isArray(quads) ? quads : quads.getQuads(null, null, null, null);
+    let q = (quads) instanceof Array ? quads : quads.getQuads(null, null, null, null);
     q.forEach(q => console.log(`[${q.subject.value} ${q.predicate.value} ${q.object.value}]`));
 }
