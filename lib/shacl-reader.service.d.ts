@@ -14,6 +14,49 @@ declare class ShaclReaderService {
      */
     private generateEntryPoints;
     /**
+    * Generates a Mutation EntryPoint RootMutationType
+    * @param types
+    * @returns
+    */
+    private generateMutationEntryPoints;
+    /**
+     * Generates an InputObject type, typically used as an argument in a mutator (always NonNull)
+     * @param type
+     * @param name
+     * @returns
+     */
+    private generateInputObjectType;
+    /**
+     * Generate the Mutation Type for existing Types
+     * @param type Original ObjectType
+     * @param context
+     * @returns
+     */
+    private generateMutationObjectType;
+    /**
+     * Generate the fields for a MutationObjectType
+     * @param type Original ObjectType
+     * @param context
+     * @returns
+     */
+    private generateMutationObjectTypeFields;
+    /**
+     * Generate fields for a MutationObjectType when the field of the original has a collection return type
+     * @param field Original field
+     * @param parentType Original Object Type
+     * @param context
+     * @returns
+     */
+    private generateMutationObjectTypeFieldsForCollection;
+    /**
+     * Generate fields for a MutationObjectType when the field of the original has a singular return type
+     * @param field Original field
+     * @param parentType Original Object Type
+     * @param context
+     * @returns
+     */
+    private generateMutationObjectTypeFieldsForSingular;
+    /**
      * Generates a GraphQLObjectType from a Shape
      * @param shape
      * @returns

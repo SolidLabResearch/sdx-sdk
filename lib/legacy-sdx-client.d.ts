@@ -1,6 +1,6 @@
 import { GraphQLResolveInfo } from 'graphql';
 import { Quad } from 'n3';
-import { C as Context } from './context-dae7af42.js';
+import { C as Context } from './context-e8613b6b.js';
 
 /**
  * Field resolver for legacy PODs.

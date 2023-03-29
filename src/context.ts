@@ -1,4 +1,4 @@
-import { GraphQLObjectType } from "graphql";
+import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import { Quad, Store } from "n3";
 import { Shape } from "./model/shape.js";
 import { groupBySubject } from "./util.js";
@@ -9,6 +9,7 @@ export class Context {
     private shapes: Shape[];
     private types: GraphQLObjectType[];
     private blankNodes: Quad[];
+    private inputTypes: GraphQLInputObjectType[] = [];
 
     /**
      * Context object for conversion from SHACL to GraphQL Schema
@@ -40,6 +41,10 @@ export class Context {
 
     getBlankNodes(): Quad[] {
         return this.blankNodes;
+    }
+
+    getInputTypes(): GraphQLInputObjectType[] {
+        return this.inputTypes;
     }
 
     private extractShapes(store: Store): Shape[] {
