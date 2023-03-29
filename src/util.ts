@@ -1,4 +1,4 @@
-import { GraphQLEnumType, GraphQLInputObjectType, GraphQLInterfaceType, GraphQLObjectType, GraphQLOutputType, GraphQLScalarType, GraphQLUnionType, isListType, isNonNullType, isObjectType, isScalarType } from "graphql";
+import { GraphQLEnumType, GraphQLInputObjectType, GraphQLInterfaceType, GraphQLNonNull, GraphQLNullableType, GraphQLObjectType, GraphQLOutputType, GraphQLScalarType, GraphQLType, GraphQLUnionType, isListType, isNonNullType, isObjectType, isScalarType } from "graphql";
 import { Quad, Quad_Subject, Store } from "n3";
 
 export function parseNameFromUri(uriString: string): string {
@@ -49,3 +49,5 @@ export const toActualType = (type: GraphQLOutputType): GraphQLObjectType | Graph
             : isObjectType(type) ? type
                 : type
 }
+
+export const unwrapNonNull= (type: GraphQLType): GraphQLType => isNonNullType(type) ? type.ofType : type;

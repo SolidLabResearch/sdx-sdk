@@ -1,12 +1,18 @@
-
 import axios from "axios";
-import { defaultFieldResolver, GraphQLField, GraphQLOutputType, GraphQLResolveInfo, GraphQLType, isListType, isNonNullType, isScalarType } from "graphql";
-import { DataFactory, Parser, Quad, Store } from "n3";
+import { defaultFieldResolver, GraphQLField, GraphQLInputField, GraphQLInputObjectType, GraphQLInputType, GraphQLOutputType, GraphQLResolveInfo, GraphQLType, isListType, isNonNullType, isScalarType } from "graphql";
+import { DataFactory, Literal, NamedNode, Parser, Quad, Store } from "n3";
+import { v4 as uuidv4 } from "uuid";
 
 import { Context } from "./context.js";
+import { LdpClient } from "./ldp-client.js";
+import { ResourceType } from "./types.js";
+import { unwrapNonNull } from "./util.js";
 import { RDFS } from "./vocab.js";
 
-const { namedNode } = DataFactory;
+const { namedNode, quad, literal } = DataFactory;
+
+const ID_FIELD = "id";
+const SLUG_FIELD = "slug";
 
 /**
  * Field resolver for legacy PODs.
@@ -155,8 +161,56 @@ export function fieldResolver<TArgs>(location: string) {
 
     async function handleMutation(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
         console.log('MUTATION TIME!!!');
+        const { fieldName } = info;
+        if (fieldName.startsWith("create")) return handleCreateMutation(source, args, context, info);
+        if (fieldName.startsWith("mutate")) return handleGetMutateObjectType();
+        if (fieldName === "update") return TODO();
+        if (fieldName === "delete") return handleDeleteMutation();
+        if (fieldName.startsWith("set")) return TODO();
+        if (fieldName.startsWith("clear")) return TODO();
+        if (fieldName.startsWith("add")) return TODO();
+        if (fieldName.startsWith("remove")) return TODO();
+        if (fieldName.startsWith("link")) return TODO();
+        if (fieldName.startsWith("unlink")) return TODO();
         return;
     }
+
+
+    async function handleCreateMutation(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo) {
+        console.log('CREATE MUTATION');
+        const classUri = getDirectives(info.returnType).is['class'];
+        const targetUrl = location;
+        // Create mutations should always have an input argument.
+        const input = (args as any).input;
+        console.log(classUri)
+        console.log(input)
+        console.log(targetUrl)
+        const resourceType = ResourceType.DOCUMENT;//ldpClient.fetchResourceType(targetUrl)
+        const id = getNewInstanceID(input, resourceType);
+        const inputType = info.parentType.getFields()[info.fieldName]!.args.find(arg => arg.name === "input")!.type;
+        const content = generateTriplesForInput(namedNode(id), input, unwrapNonNull(inputType) as GraphQLInputObjectType, namedNode(classUri));
+        switch (resourceType) {
+            case ResourceType.DOCUMENT:
+                // Append triples to doc using patch
+                new LdpClient().patchDocument(targetUrl, content);
+                return;
+        }
+        return;
+    }
+
+    async function handleGetMutateObjectType() {
+        console.log('GET MUTATE OBJECT TYPE');
+        return;
+    }
+
+    async function handleDeleteMutation() {
+        console.log('DELETE MUTATION');
+        return;
+    }
+}
+
+function TODO() {
+    alert('TODO');
 }
 
 function getIdentifier(store: Store, type: GraphQLOutputType): string {
@@ -173,7 +227,7 @@ function getProperties(store: Store, subject: string, predicate: string): string
 }
 
 
-function getDirectives(type: GraphQLType | GraphQLField<any, any, any>): Record<string, any> {
+function getDirectives(type: GraphQLType | GraphQLField<any, any, any> | GraphQLInputField): Record<string, any> {
     if (isListType(type)) {
         return getDirectives(type.ofType);
     }
@@ -181,4 +235,25 @@ function getDirectives(type: GraphQLType | GraphQLField<any, any, any>): Record<
         return getDirectives(type.ofType);
     }
     return isScalarType(type) ? {} : type.extensions.directives ?? {};
+}
+
+function getNewInstanceID(input: Record<string, any>, resourceType: ResourceType): string {
+    switch (resourceType) {
+        case ResourceType.CONTAINER: return '';
+        case ResourceType.DOCUMENT: return input[ID_FIELD]?.toString() ?? `#${input[SLUG_FIELD]}` ?? uuidv4();
+        default: return '';
+    }
+}
+
+function generateTriplesForInput(subject: NamedNode, input: Record<string, any>, inputDefinition: GraphQLInputObjectType, classUri: NamedNode): Quad[] {
+    const quads: Quad[] = [];
+    quads.push(quad(subject, RDFS.a, classUri));
+    return Object.values(inputDefinition.getFields())
+        .filter(field => field.name !== "slug" && field.name !== "id")
+        .reduce((acc, field) => {
+            if (field.name in input) {
+                acc.push(quad(subject, namedNode(getDirectives(field).property['iri']), literal(input[field.name])))
+            }
+            return acc;
+        }, quads);
 }

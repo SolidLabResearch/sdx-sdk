@@ -13,15 +13,10 @@ export function legacyRequester(podLocation: string) {
         }
         const schema = await parser.parseSHACLs(URI_SDX_GENERATE_SHACL_FOLDER);
 
-        console.log(query);
-        console.log(vars);
-
-
         const result = await graphql({
             source: query,
             variableValues: vars!,
             schema,
-
             fieldResolver: legacy.fieldResolver(podLocation)
         });
         // console.log(result.errors)

@@ -1,4 +1,4 @@
-import { GraphQLScalarType, GraphQLObjectType, GraphQLInputObjectType, GraphQLOutputType, GraphQLInterfaceType, GraphQLUnionType, GraphQLEnumType } from 'graphql';
+import { GraphQLScalarType, GraphQLObjectType, GraphQLInputObjectType, GraphQLOutputType, GraphQLInterfaceType, GraphQLUnionType, GraphQLEnumType, GraphQLType } from 'graphql';
 import { Quad, Quad_Subject, Store } from 'n3';
 
 declare function parseNameFromUri(uriString: string): string;
@@ -11,5 +11,6 @@ declare const isOrContainsScalar: (type: unknown) => type is GraphQLScalarType<u
 declare const isOrContainsObjectType: (type: unknown) => type is GraphQLObjectType<any, any>;
 declare const isOrContainsInputObjectType: (type: unknown) => type is GraphQLInputObjectType;
 declare const toActualType: (type: GraphQLOutputType) => GraphQLObjectType | GraphQLScalarType<unknown, unknown> | GraphQLInterfaceType | GraphQLUnionType | GraphQLEnumType;
+declare const unwrapNonNull: (type: GraphQLType) => GraphQLType;
 
-export { capitalize, decapitalize, groupBySubject, isOrContainsInputObjectType, isOrContainsObjectType, isOrContainsScalar, parseNameFromUri, plural, printQuads, toActualType };
+export { capitalize, decapitalize, groupBySubject, isOrContainsInputObjectType, isOrContainsObjectType, isOrContainsScalar, parseNameFromUri, plural, printQuads, toActualType, unwrapNonNull };
