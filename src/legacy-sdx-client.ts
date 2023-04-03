@@ -22,7 +22,7 @@ const SLUG_FIELD = "slug";
 export function fieldResolver<TArgs>(location: string) {
     return async (source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo): Promise<unknown> => {
         const { returnType, schema, fieldName, parentType, fieldNodes, path, rootValue, operation } = info;
-        console.log('OP: ', operation);
+        // console.log('OP: ', operation);
         const rootTypes = [
             schema.getQueryType()?.name,
             schema.getMutationType()?.name,
@@ -35,6 +35,7 @@ export function fieldResolver<TArgs>(location: string) {
         if ('mutation' === operation.operation) {
             return handleMutation(source, args, context, info, rootTypes);
         }
+
 
 
     };
@@ -52,18 +53,11 @@ export function fieldResolver<TArgs>(location: string) {
 
     async function getSubGraph(source: Quad[], className: string, args: Record<string, any>): Promise<Quad[]> {
         const store = new Store(source);
-
-        // TODO: only id filter support
         const id = args?.id;
-        // console.log(args)
-        // if (id) { console.log('ARG ID:', id); };
-        // printQuads(store);
         let topQuads = store.getSubjects(RDFS.a, namedNode(className), null).flatMap(sub => store.getQuads(sub, null, null, null));
-        // printQuads(topQuads, 'TOP')
         if (id) {
             topQuads = topQuads.filter(quad => quad.subject.value === id);
         }
-        // printQuads(source, 'OUTSIDE STORE');
         const follow = (quads: Quad[], store: Store): Quad[] => {
             return quads.reduce((acc, quad) => (quad.object.termType === 'BlankNode' || quad.object.termType === 'NamedNode')
                 ? [...acc, quad, ...follow(store.getQuads(quad.object, null, null, null), store)]
@@ -71,12 +65,6 @@ export function fieldResolver<TArgs>(location: string) {
                 [] as Quad[]);
         }
         return follow(topQuads, store);
-
-
-        // TODO:
-        // get all quads (filtered by shape AND optional identifier)
-        // for $obj === NamedNode | BlankBode (A)
-        // Get all quads with $obj as subject (repeat A)
     }
 
     async function getGraph(location: string): Promise<Quad[]> {
@@ -122,7 +110,6 @@ export function fieldResolver<TArgs>(location: string) {
         } else {
             // Scalar
             if (isScalarType(returnType) || (isNonNullType(returnType) && isScalarType(returnType.ofType))) {
-                // console.log('--SCALAR found', fieldName);
                 // Enclosing type quads
                 const store = new Store(source || []);
                 const id = getIdentifier(store, parentType);
@@ -132,7 +119,7 @@ export function fieldResolver<TArgs>(location: string) {
                 const field = parentType.getFields()[fieldName]!;
                 const directives = getDirectives(field);
 
-                if (directives.identifier) {
+                if (directives.identifier || returnType.toString() === 'ID') {
                     // console.log('--IDENT DIRECTIVE found', fieldName, id);
                     return id;
                 }
@@ -149,8 +136,8 @@ export function fieldResolver<TArgs>(location: string) {
             // Object type
             else {
                 // console.log('NON scalar')
-                // console.log('--TYPE found', returnType.toString());
                 // const type = schema.getType(returnType.toString())! as GraphQLOutputType;
+
                 const className = getDirectives(returnType).is['class'] as string;
                 return getSubGraph(source, className, {});
 
@@ -160,24 +147,27 @@ export function fieldResolver<TArgs>(location: string) {
 
 
     async function handleMutation(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
-        console.log('MUTATION TIME!!!');
-        const { fieldName } = info;
-        if (fieldName.startsWith("create")) return handleCreateMutation(source, args, context, info);
-        if (fieldName.startsWith("mutate")) return handleGetMutateObjectType();
+        const { returnType, schema, fieldName, parentType, fieldNodes, path, rootValue, operation } = info;
+        if (rootTypes.includes(parentType.name)) {
+            const className = getDirectives(returnType).is['class'] as string;
+            source = await getGraph(location).then(quads => getSubGraph(quads, className, args as any));
+        }
+        if (fieldName === "delete") return handleDeleteMutation(source, args, context, info);
         if (fieldName === "update") return TODO();
-        if (fieldName === "delete") return handleDeleteMutation();
+        if (fieldName.startsWith("create")) return handleCreateMutation(source, args, context, info, rootTypes);
+        if (fieldName.startsWith("mutate")) return handleGetMutateObjectType(source, args, context, info, rootTypes);
         if (fieldName.startsWith("set")) return TODO();
         if (fieldName.startsWith("clear")) return TODO();
         if (fieldName.startsWith("add")) return TODO();
         if (fieldName.startsWith("remove")) return TODO();
         if (fieldName.startsWith("link")) return TODO();
         if (fieldName.startsWith("unlink")) return TODO();
-        return;
+        // It is a query for a return type
+        return handleQuery(source, args, context, info, rootTypes);
     }
 
 
-    async function handleCreateMutation(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo) {
-        console.log('CREATE MUTATION');
+    async function handleCreateMutation(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
         const classUri = getDirectives(info.returnType).is['class'];
         const targetUrl = location;
         // Create mutations should always have an input argument.
@@ -192,20 +182,35 @@ export function fieldResolver<TArgs>(location: string) {
         switch (resourceType) {
             case ResourceType.DOCUMENT:
                 // Append triples to doc using patch
-                new LdpClient().patchDocument(targetUrl, content);
-                return;
+                await new LdpClient().patchDocument(targetUrl, content);
         }
-        return;
+        return content;
     }
 
-    async function handleGetMutateObjectType() {
-        console.log('GET MUTATE OBJECT TYPE');
-        return;
+    async function handleGetMutateObjectType(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
+        const classUri = getDirectives(info.returnType).is['class'];
+        const targetUrl = location;
+
+        if (targetUrl != null) {
+            const resourceType = ResourceType.DOCUMENT;//ldpClient.fetchResourceType(targetUrl)
+            const id = (args as any).id;
+            return getSubGraph(source, classUri, { id });
+        } else {
+            throw new Error("A target URL for this request could not be resolved!")
+        }
     }
 
-    async function handleDeleteMutation() {
+    async function handleDeleteMutation(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo): Promise<Quad[]> {
         console.log('DELETE MUTATION');
-        return;
+        const resourceType = ResourceType.DOCUMENT;
+        const targetUrl = location;
+        switch (resourceType) {
+            case ResourceType.DOCUMENT:
+                // Append triples to doc using patch
+                await new LdpClient().patchDocument(targetUrl, null, source);
+        }
+        return source;
+
     }
 }
 
