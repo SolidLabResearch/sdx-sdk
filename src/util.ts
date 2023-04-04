@@ -1,4 +1,5 @@
 import { GraphQLEnumType, GraphQLInputObjectType, GraphQLInterfaceType, GraphQLNonNull, GraphQLNullableType, GraphQLObjectType, GraphQLOutputType, GraphQLScalarType, GraphQLType, GraphQLUnionType, isListType, isNonNullType, isObjectType, isScalarType } from "graphql";
+import { GraphQLInputType } from "graphql/type/definition";
 import { Quad, Quad_Subject, Store } from "n3";
 
 export function parseNameFromUri(uriString: string): string {
@@ -39,7 +40,7 @@ export const isOrContainsObjectType = (type: unknown): type is GraphQLObjectType
     || (isNonNullType(type) && isOrContainsObjectType(type.ofType))
     || (isListType(type) && isOrContainsObjectType(type.ofType));
 
-    export const isOrContainsInputObjectType = (type: unknown): type is GraphQLInputObjectType => isObjectType(type)
+export const isOrContainsInputObjectType = (type: unknown): type is GraphQLInputObjectType => isObjectType(type)
     || (isNonNullType(type) && isOrContainsInputObjectType(type.ofType))
     || (isListType(type) && isOrContainsInputObjectType(type.ofType));
 
@@ -50,4 +51,4 @@ export const toActualType = (type: GraphQLOutputType): GraphQLObjectType | Graph
                 : type
 }
 
-export const unwrapNonNull= (type: GraphQLType): GraphQLType => isNonNullType(type) ? type.ofType : type;
+export const unwrapNonNull = (type: GraphQLType): GraphQLType | GraphQLInputType | GraphQLOutputType => isNonNullType(type) ? type.ofType : type;

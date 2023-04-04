@@ -8,6 +8,7 @@ export class LdpClient {
         const deletesWriter = new Writer({ format: "N-Triples", prefixes: { solid: "http://www.w3.org/ns/solid/terms#" } });
         let n3Inserts = null;
         let n3Deletes = null;
+
         if (inserts) {
             insertsWriter.addQuads(inserts);
             insertsWriter.end((_, result) => n3Inserts = `solid:inserts { ${result} }`);

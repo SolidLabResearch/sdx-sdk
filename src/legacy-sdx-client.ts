@@ -1,5 +1,5 @@
 import axios from "axios";
-import { defaultFieldResolver, GraphQLField, GraphQLInputField, GraphQLInputObjectType, GraphQLInputType, GraphQLOutputType, GraphQLResolveInfo, GraphQLType, isListType, isNonNullType, isScalarType } from "graphql";
+import { defaultFieldResolver, GraphQLField, GraphQLInputField, GraphQLInputObjectType, GraphQLInputType, GraphQLObjectType, GraphQLOutputType, GraphQLResolveInfo, GraphQLType, isListType, isNonNullType, isScalarType } from "graphql";
 import { DataFactory, Literal, NamedNode, Parser, Quad, Store } from "n3";
 import { v4 as uuidv4 } from "uuid";
 
@@ -14,20 +14,35 @@ const { namedNode, quad, literal } = DataFactory;
 const ID_FIELD = "id";
 const SLUG_FIELD = "slug";
 
+export interface IntermediateResult {
+    requestUrl: string;
+    resourceType: ResourceType;
+    quads: Quad[];
+    subject?: NamedNode;
+}
+
 /**
  * Field resolver for legacy PODs.
  * @param location Location of the root graph.
  * @returns 
  */
 export function fieldResolver<TArgs>(location: string) {
-    return async (source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo): Promise<unknown> => {
+    return async (source: IntermediateResult, args: TArgs, context: Context, info: GraphQLResolveInfo): Promise<unknown> => {
         const { returnType, schema, fieldName, parentType, fieldNodes, path, rootValue, operation } = info;
-        // console.log('OP: ', operation);
+        // setup intermediate result
+        if (!source) {
+            source = {
+                quads: [],
+                requestUrl: location,
+                resourceType: ResourceType.DOCUMENT
+            }
+        }
+
         const rootTypes = [
             schema.getQueryType()?.name,
             schema.getMutationType()?.name,
             schema.getSubscriptionType()?.name,
-        ].filter(t => !!t) as string[];
+        ].filter(t => !!t) as string[];     
 
         if ('query' === operation.operation) {
             return handleQuery(source, args, context, info, rootTypes);
@@ -73,19 +88,19 @@ export function fieldResolver<TArgs>(location: string) {
         return new Parser().parse(doc.data);
     }
 
-    async function handleQuery(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
+    async function handleQuery(source: IntermediateResult, args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<IntermediateResult | unknown > {
+        // console.log('query', source)
         const { returnType, schema, fieldName, parentType, fieldNodes, path, rootValue, operation } = info;
         if (rootTypes.includes(parentType.name)) {
             const className = getDirectives(returnType).is['class'] as string;
-            source = await getGraph(location).then(quads => getSubGraph(quads, className, args as any));
+            source.quads = await getGraph(location).then(quads => getSubGraph(quads, className, args as any));
         }
         // Array
         if (isListType(returnType)) {
-            // console.log(`--ARRAY found`, fieldName)
             // Scalar
             if (isScalarType(returnType.ofType) || (isNonNullType(returnType.ofType) && isScalarType(returnType.ofType.ofType))) {
                 // Enclosing type quads
-                const store = new Store(source || []);
+                const store = new Store(source.quads || []);
                 const id = getIdentifier(store, parentType);
 
                 // Parse based on directives
@@ -105,13 +120,13 @@ export function fieldResolver<TArgs>(location: string) {
             // Object
             else {
                 const className = getDirectives(returnType).is['class'] as string;
-                return getSubGraphArray(source, className, {});
+                return (await getSubGraphArray(source.quads!, className, {})).map(quads => ({ ...source, quads }));
             }
         } else {
             // Scalar
             if (isScalarType(returnType) || (isNonNullType(returnType) && isScalarType(returnType.ofType))) {
                 // Enclosing type quads
-                const store = new Store(source || []);
+                const store = new Store(source.quads || []);
                 const id = getIdentifier(store, parentType);
                 // printQuads(store)
 
@@ -135,25 +150,26 @@ export function fieldResolver<TArgs>(location: string) {
             }
             // Object type
             else {
-                // console.log('NON scalar')
                 // const type = schema.getType(returnType.toString())! as GraphQLOutputType;
 
                 const className = getDirectives(returnType).is['class'] as string;
-                return getSubGraph(source, className, {});
+                source.quads = await getSubGraph(source.quads!, className, {});
+                return source;
 
             }
         }
     }
 
 
-    async function handleMutation(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
+    async function handleMutation(source: IntermediateResult, args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
         const { returnType, schema, fieldName, parentType, fieldNodes, path, rootValue, operation } = info;
         if (rootTypes.includes(parentType.name)) {
             const className = getDirectives(returnType).is['class'] as string;
-            source = await getGraph(location).then(quads => getSubGraph(quads, className, args as any));
+            const graph = await getGraph(source.requestUrl!);
+            source.quads = await getSubGraph(graph, className, args as any);
         }
         if (fieldName === "delete") return handleDeleteMutation(source, args, context, info);
-        if (fieldName === "update") return TODO();
+        if (fieldName === "update") return handleUpdateMutation(source, args, context, info);
         if (fieldName.startsWith("create")) return handleCreateMutation(source, args, context, info, rootTypes);
         if (fieldName.startsWith("mutate")) return handleGetMutateObjectType(source, args, context, info, rootTypes);
         if (fieldName.startsWith("set")) return TODO();
@@ -167,50 +183,62 @@ export function fieldResolver<TArgs>(location: string) {
     }
 
 
-    async function handleCreateMutation(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
+    async function handleCreateMutation(source: IntermediateResult, args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<IntermediateResult> {
+        console.log('create', source);
         const classUri = getDirectives(info.returnType).is['class'];
-        const targetUrl = location;
+        const targetUrl = source.requestUrl!;
         // Create mutations should always have an input argument.
         const input = (args as any).input;
-        console.log(classUri)
-        console.log(input)
-        console.log(targetUrl)
-        const resourceType = ResourceType.DOCUMENT;//ldpClient.fetchResourceType(targetUrl)
-        const id = getNewInstanceID(input, resourceType);
+        source.subject = namedNode(getNewInstanceID(input, source.resourceType!));
         const inputType = info.parentType.getFields()[info.fieldName]!.args.find(arg => arg.name === "input")!.type;
-        const content = generateTriplesForInput(namedNode(id), input, unwrapNonNull(inputType) as GraphQLInputObjectType, namedNode(classUri));
-        switch (resourceType) {
+        source.quads = generateTriplesForInput(source.subject, input, unwrapNonNull(inputType) as GraphQLInputObjectType, namedNode(classUri));
+        switch (source.resourceType!) {
             case ResourceType.DOCUMENT:
                 // Append triples to doc using patch
-                await new LdpClient().patchDocument(targetUrl, content);
+                await new LdpClient().patchDocument(targetUrl, source.quads);
         }
-        return content;
+        return source;
     }
 
-    async function handleGetMutateObjectType(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
+    async function handleGetMutateObjectType(source: IntermediateResult, args: TArgs, context: Context, info: GraphQLResolveInfo, rootTypes: string[]): Promise<IntermediateResult> {
         const classUri = getDirectives(info.returnType).is['class'];
-        const targetUrl = location;
+        console.log(source);
 
-        if (targetUrl != null) {
-            const resourceType = ResourceType.DOCUMENT;//ldpClient.fetchResourceType(targetUrl)
-            const id = (args as any).id;
-            return getSubGraph(source, classUri, { id });
+        if (source.requestUrl) {
+            source.subject = namedNode((args as any).id);
+            source.quads = await getSubGraph(source.quads!, classUri, args as any);
+            return source;
         } else {
             throw new Error("A target URL for this request could not be resolved!")
         }
     }
 
-    async function handleDeleteMutation(source: Quad[], args: TArgs, context: Context, info: GraphQLResolveInfo): Promise<Quad[]> {
+    async function handleDeleteMutation(source: IntermediateResult, args: TArgs, context: Context, info: GraphQLResolveInfo): Promise<IntermediateResult> {
         console.log('DELETE MUTATION');
-        const resourceType = ResourceType.DOCUMENT;
-        const targetUrl = location;
-        switch (resourceType) {
+        switch (source.resourceType!) {
             case ResourceType.DOCUMENT:
                 // Append triples to doc using patch
-                await new LdpClient().patchDocument(targetUrl, null, source);
+                await new LdpClient().patchDocument(source.requestUrl!, null, source.quads);
         }
         return source;
 
+    }
+
+    async function handleUpdateMutation(source: IntermediateResult, args: TArgs, context: Context, info: GraphQLResolveInfo): Promise<IntermediateResult> {
+        const returnType = info.schema.getType(unwrapNonNull(info.returnType).toString()) as GraphQLObjectType;
+        const input = (args as any).input;
+        const { inserts, deletes } = generateTriplesForUpdate(source.quads!, input, source.subject!, returnType);
+        switch (source.resourceType!) {
+            case ResourceType.DOCUMENT:
+                // Update triples in doc using patch
+                await new LdpClient().patchDocument(source.requestUrl!, inserts, deletes);
+        }
+        // Reconstruct object
+        const store = new Store(source.quads);
+        store.removeQuads(deletes);
+        store.addQuads(inserts);
+        source.quads = store.getQuads(null, null, null, null);
+        return source;
     }
 }
 
@@ -261,4 +289,33 @@ function generateTriplesForInput(subject: NamedNode, input: Record<string, any>,
             }
             return acc;
         }, quads);
+}
+
+function generateTriplesForUpdate(source: Quad[], input: Record<string, any>, subject: NamedNode, objectTypeDefinition: GraphQLObjectType): { inserts: Quad[], deletes: Quad[] } {
+    const store = new Store(source);
+    const inserts: Quad[] = [];
+    const deletes: Quad[] = [];
+
+    Object.entries(input).forEach(([fieldName, value]) => {
+        const fieldDef = objectTypeDefinition.getFields()[fieldName]!;
+        const propertyIri = getDirectives(fieldDef).property['iri'];
+
+        // Throw error if value is null and type was nonnull
+        if (value == null) {
+            if (isNonNullType(fieldDef.type)) {
+                throw new Error(`Update input provided null value for non-nullable field '${fieldName}'`);
+            }
+            // Add quad to deletes, because it was set explicitly set to null
+            deletes.push(...store.getQuads(subject, namedNode(propertyIri), null, null));
+        } else {
+            // Remove and then insert quads, to perform upgrade
+            deletes.push(...store.getQuads(subject, namedNode(propertyIri), null, null));
+            if (isListType(fieldDef.type)) {
+                inserts.push(...value.map((v: any) => quad(subject, namedNode(propertyIri), literal(v))));
+            } else {
+                inserts.push(quad(subject, namedNode(propertyIri), literal(value)));
+            }
+        }
+    });
+    return { inserts, deletes };
 }
