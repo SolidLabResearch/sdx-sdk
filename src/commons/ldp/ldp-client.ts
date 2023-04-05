@@ -1,9 +1,15 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import { Quad, Writer } from "n3"
+import { SolidClientCredentials } from '../auth/solid-client-credentials';
 
 export class LdpClient {
+    private clientCredentials?: SolidClientCredentials;
 
-    async patchDocument(url: string, inserts: Quad[] | null = null, deletes: Quad[] | null = null) {
+    constructor(clientCredentials?: SolidClientCredentials) {
+        this.clientCredentials = clientCredentials;
+    }
+
+    async patchDocument(url: string, inserts: Quad[] | null = null, deletes: Quad[] | null = null): Promise<AxiosResponse> {
         const insertsWriter = new Writer({ format: "N-Triples", prefixes: { solid: "http://www.w3.org/ns/solid/terms#" } });
         const deletesWriter = new Writer({ format: "N-Triples", prefixes: { solid: "http://www.w3.org/ns/solid/terms#" } });
         let n3Inserts = null;
@@ -21,7 +27,7 @@ export class LdpClient {
         const patchContent = [n3Inserts, n3Deletes].filter(item => item != null).join(';') + '.';
         const requestBody = `@prefix solid: <http://www.w3.org/ns/solid/terms#>.\n_:rename a solid:InsertDeletePatch;\n${patchContent}`
 
-        const resp = await axios.patch(url, requestBody, {
+        const resp = await axios({method: 'patch', url, data: requestBody,
             headers: {
                 'Content-Type': 'text/n3'
             }

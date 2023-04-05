@@ -1,12 +1,19 @@
 import { GraphQLResolveInfo } from 'graphql';
 import { Quad, NamedNode } from 'n3';
-import { C as Context } from './context-e8613b6b.js';
+import { LdpClient } from './commons/ldp/ldp-client.js';
 import { ResourceType } from './types.js';
+import { SolidLDPContext } from './backends/ldp/solid-ldp-backend.js';
+import 'axios';
+import './commons/auth/solid-client-credentials.js';
+import 'graphql/jsutils/ObjMap';
+import 'graphql/execution/execute';
+import 'graphql/language/ast';
+import './backends/ldp/target-resolvers.js';
 
 interface IntermediateResult {
-    requestUrl: string;
-    resourceType: ResourceType;
     quads: Quad[];
+    parentClassIri?: string;
+    resourceType: ResourceType;
     subject?: NamedNode;
 }
 /**
@@ -14,6 +21,6 @@ interface IntermediateResult {
  * @param location Location of the root graph.
  * @returns
  */
-declare function fieldResolver<TArgs>(location: string): (source: IntermediateResult, args: TArgs, context: Context, info: GraphQLResolveInfo) => Promise<unknown>;
+declare function fieldResolver<TArgs>(ldpClient: LdpClient): (source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo) => Promise<unknown>;
 
 export { IntermediateResult, fieldResolver };

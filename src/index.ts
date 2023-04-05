@@ -1,4 +1,6 @@
 // Polyfills
-import "./polyfills.js";
+import "reflect-metadata";
+// import "./polyfills.js";
 
-export { legacyRequester } from "./sdx-client"
+export * from './backends/ldp/solid-ldp-backend';
+export * from './backends/ldp/target-resolvers';
