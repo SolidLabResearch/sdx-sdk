@@ -17,7 +17,7 @@ export class MutationHandler {
     }
 
     async handleMutation<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
-        const { returnType, schema, fieldName, parentType, fieldNodes, path, rootValue, operation } = info;
+        const { returnType, fieldName, parentType } = info;
         if (rootTypes.includes(parentType.name)) {
             const className = this.getDirectives(returnType).is['class'] as string;
             const targetUrl = await context.resolver.resolve(className, new TargetResolverContext(this.ldpClient))
@@ -35,8 +35,7 @@ export class MutationHandler {
         if (fieldName.startsWith("link")) return this.TODO();
         if (fieldName.startsWith("unlink")) return this.TODO();
         // Mutation handler can't solve it, maybe the query handler can?
-        source.queryOverride = true;
-        return source;
+        return this.executeWithQueryHandler(source);
     }
 
 
