@@ -1,4 +1,4 @@
 // Polyfills
 
 // Needed for tsyringe:
-import "reflect-metadata";
+import "@abraham/reflection";
