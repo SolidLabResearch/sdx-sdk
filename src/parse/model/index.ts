@@ -1,2 +1,2 @@
-export * from './shape.js';
-export * from './property-shape.js';
+export * from './shape';
+export * from './property-shape';

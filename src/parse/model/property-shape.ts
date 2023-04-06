@@ -1,6 +1,6 @@
 import { GraphQLObjectType, GraphQLType, GraphQLFloat, GraphQLInt, GraphQLString } from "graphql";
 import { DataFactory, NamedNode, Quad, Store } from "n3";
-import { Context } from "../context.js";
+import { Context } from "../context";
 import { utils, vocab } from "../../commons";
 const { namedNode } = DataFactory;
 

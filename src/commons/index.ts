@@ -1,8 +1,8 @@
-import * as utils from './util.js';
+import * as utils from './util';
 export { utils };
 
-import * as vocab from './vocab.js';
+import * as vocab from './vocab';
 export { vocab };
 
-export * from './auth/solid-client-credentials.js'
-export * from './ldp/ldp-client.js'
+export * from './auth/solid-client-credentials';
+export * from './ldp/ldp-client';

@@ -1,6 +1,6 @@
 import { NamedNode, Quad, Store } from "n3";
-import { Context } from "../context.js";
-import { PropertyShape } from "./property-shape.js";
+import { Context } from "../context";
+import { PropertyShape } from "./property-shape";
 import { utils, vocab } from "../../commons";
 
 export class Shape {

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { DirectiveLocation, GraphQLDirective, GraphQLField, GraphQLFieldConfig, GraphQLID, GraphQLInputField, GraphQLInputFieldConfig, GraphQLInputObjectType, GraphQLInputType, GraphQLList, GraphQLNonNull, GraphQLObjectType, GraphQLObjectTypeConfig, GraphQLOutputType, GraphQLSchema, GraphQLString, GraphQLType, isListType, isNonNullType, specifiedScalarTypes, ThunkObjMap } from "graphql";
 import { DataFactory, Parser, Quad } from 'n3';
 import { autoInjectable, singleton } from "tsyringe";
-import { Context } from './context.js';
+import { Context } from './context';
 import { PropertyShape, Shape } from "./model";
 import { utils } from '../commons';
 
