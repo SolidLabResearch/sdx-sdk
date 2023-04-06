@@ -9,19 +9,18 @@ export class TargetResolverContext {
 }
 
 export class StaticTargetResolver implements TargetResolver {
+    private target: URL;
 
-    constructor(private targetUrl: string) {
-        console.log('YES')
-       
-    }
-
-    resolve = async (classIri: string, context: TargetResolverContext): Promise<URL> => {
+    constructor(private targetUrl: string) { 
         try {
-            const target = new URL(this.targetUrl);
-            return target;
+            this.target = new URL(this.targetUrl);
         } catch {
             throw new Error('Target must be a valid URL!');
         }
+    }
+
+    resolve = async (classIri: string, context: TargetResolverContext): Promise<URL> => {
+        return this.target
     }
 
 }

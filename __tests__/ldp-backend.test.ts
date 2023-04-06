@@ -1,5 +1,18 @@
-import { StaticTargetResolver, TargetResolverContext } from "../src";
+import { SolidLDPContext, StaticTargetResolver, TargetResolverContext } from "../src";
 import { LdpClient } from "../src/commons";
+
+
+describe('SolidLDPContext', () => {
+    it('can take a string as argument', () => {
+        const context = new SolidLDPContext('https://example.com');
+        expect(context.resolver).toBeInstanceOf(StaticTargetResolver);
+    });
+
+    it('can take a TargetResolver as argument', () => {
+        const context = new SolidLDPContext(new StaticTargetResolver('https://example.com'));
+        expect(context.resolver).toBeInstanceOf(StaticTargetResolver);
+    });
+});
 
 describe("StaticTargetResolver", () => {
     it("always resolves to a set URI", async () => {

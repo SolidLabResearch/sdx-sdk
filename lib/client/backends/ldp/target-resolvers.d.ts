@@ -12,6 +12,7 @@ declare class TargetResolverContext {
 }
 declare class StaticTargetResolver implements TargetResolver {
     private targetUrl;
+    private target;
     constructor(targetUrl: string);
     resolve: (classIri: string, context: TargetResolverContext) => Promise<URL>;
 }
