@@ -4,11 +4,10 @@ import { DocumentNode } from "graphql/language/ast";
 import { LdpClient, SolidClientCredentials } from "../../../commons";
 import { URI_SDX_GENERATE_GRAPHQL_SCHEMA, URI_SDX_GENERATE_SHACL_FOLDER } from "../../../constants";
 import { ShaclReaderService } from "../../../parse";
-import * as legacy from "./impl/legacy-sdx-client.js";
-import { StaticTargetResolver, TargetResolver } from "./target-resolvers";
-import { QueryHandler } from "./impl/query-handler";
 import { MutationHandler } from "./impl/mutation-handler";
+import { QueryHandler } from "./impl/query-handler";
 import { IntermediateResult, ResourceType } from "./impl/utils";
+import { StaticTargetResolver, TargetResolver } from "./target-resolvers";
 
 export class SolidLDPContext implements SolidTargetBackendContext {
     resolver: TargetResolver;
@@ -35,6 +34,7 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     private defaultContext?: SolidLDPContext;
     private queryHandler: QueryHandler;
     private mutationHandler: MutationHandler;
+    private rootTypes: string[] = [];
 
     constructor(options?: SolidLDPBackendOptions) {
         // TODO: Use schema to parse, instead of SHACL files
@@ -55,6 +55,11 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
             await parser.primeCache(URI_SDX_GENERATE_SHACL_FOLDER);
         }
         const schema = await parser.parseSHACLs(URI_SDX_GENERATE_SHACL_FOLDER);
+        this.rootTypes = [
+            schema.getQueryType()?.name,
+            schema.getMutationType()?.name,
+            schema.getSubscriptionType()?.name,
+        ].filter(t => !!t) as string[];
 
         const result = await graphql({
             source: query,
@@ -75,17 +80,13 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
             resourceType: ResourceType.DOCUMENT
         }
 
-        const rootTypes = [
-            schema.getQueryType()?.name,
-            schema.getMutationType()?.name,
-            schema.getSubscriptionType()?.name,
-        ].filter(t => !!t) as string[];
-
-        if ('query' === operation.operation) {
-            return this.queryHandler.handleQuery(source, args, context, info, rootTypes);
+        // Pure mutation
+        if ('mutation' === operation.operation && !source.queryOverride) {
+            return this.mutationHandler.handleMutation(source, args, context, info, this.rootTypes);
         }
-        if ('mutation' === operation.operation) {
-            return this.mutationHandler.handleMutation(source, args, context, info, rootTypes, this.queryHandler);
+        // Pure query, or mutation return type query (queryOverride)
+        if ('query' === operation.operation || source.queryOverride) {
+            return this.queryHandler.handleQuery(source, args, context, info, this.rootTypes);
         }
 
     }

@@ -22,6 +22,7 @@ declare class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     private defaultContext?;
     private queryHandler;
     private mutationHandler;
+    private rootTypes;
     constructor(options?: SolidLDPBackendOptions);
     requester: <R, V>(doc: DocumentNode, vars?: V | undefined, context?: SolidLDPContext) => Promise<ExecutionResult<R, graphql_jsutils_ObjMap.ObjMap<unknown>>>;
     private fieldResolver;

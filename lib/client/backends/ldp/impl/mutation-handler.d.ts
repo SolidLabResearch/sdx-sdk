@@ -1,7 +1,6 @@
 import { GraphQLResolveInfo } from 'graphql';
 import { LdpClient } from '../../../../commons/ldp/ldp-client.js';
 import { SolidLDPContext } from '../solid-ldp-backend.js';
-import { QueryHandler } from './query-handler.js';
 import { IntermediateResult } from './utils.js';
 import 'axios';
 import 'n3';
@@ -14,7 +13,7 @@ import '../target-resolvers.js';
 declare class MutationHandler {
     private ldpClient;
     constructor(ldpClient: LdpClient);
-    handleMutation<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo, rootTypes: string[], queryHandler: QueryHandler): Promise<unknown>;
+    handleMutation<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown>;
     private handleCreateMutation;
     private handleGetMutateObjectType;
     private handleDeleteMutation;
@@ -24,6 +23,7 @@ declare class MutationHandler {
     private generateTriplesForInput;
     private generateTriplesForUpdate;
     private TODO;
+    private executeWithQueryHandler;
 }
 
 export { MutationHandler };

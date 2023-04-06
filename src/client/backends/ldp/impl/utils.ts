@@ -56,4 +56,5 @@ export interface IntermediateResult {
     parentClassIri?: string;
     resourceType: ResourceType;
     subject?: NamedNode;
+    queryOverride?: boolean;
 }

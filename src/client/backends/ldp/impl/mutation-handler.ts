@@ -1,11 +1,10 @@
 import { GraphQLField, GraphQLInputField, GraphQLInputObjectType, GraphQLObjectType, GraphQLResolveInfo, GraphQLType, isListType, isNonNullType, isScalarType } from "graphql";
 import { DataFactory, NamedNode, Quad, Store } from "n3";
+import { v4 as uuidv4 } from "uuid";
 import { LdpClient, utils, vocab } from "../../../../commons";
 import { SolidLDPContext } from "../solid-ldp-backend";
 import { TargetResolverContext } from "../target-resolvers";
-import { QueryHandler } from "./query-handler";
 import { IntermediateResult, ResourceType, getDirectives, getGraph, getSubGraph } from "./utils";
-import { v4 as uuidv4 } from "uuid";
 
 const { literal, namedNode, quad } = DataFactory;
 const ID_FIELD = "id";
@@ -17,7 +16,7 @@ export class MutationHandler {
 
     }
 
-    async handleMutation<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo, rootTypes: string[], queryHandler: QueryHandler): Promise<unknown> {
+    async handleMutation<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo, rootTypes: string[]): Promise<unknown> {
         const { returnType, schema, fieldName, parentType, fieldNodes, path, rootValue, operation } = info;
         if (rootTypes.includes(parentType.name)) {
             const className = this.getDirectives(returnType).is['class'] as string;
@@ -35,13 +34,13 @@ export class MutationHandler {
         if (fieldName.startsWith("remove")) return this.TODO();
         if (fieldName.startsWith("link")) return this.TODO();
         if (fieldName.startsWith("unlink")) return this.TODO();
-        // It is a query for a return type
-        return queryHandler.handleQuery(source, args, context, info, rootTypes);
+        // Mutation handler can't solve it, maybe the query handler can?
+        source.queryOverride = true;
+        return source;
     }
 
 
     private async handleCreateMutation<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo, rootTypes: string[]): Promise<IntermediateResult> {
-        console.log('create', source);
         const className = this.getDirectives(info.returnType).is['class'];
         const targetUrl = await context.resolver.resolve(className, new TargetResolverContext(this.ldpClient))
         // Create mutations should always have an input argument.
@@ -54,14 +53,13 @@ export class MutationHandler {
                 // Append triples to doc using patch
                 await new LdpClient().patchDocument(targetUrl.toString(), source.quads);
         }
-        return source;
+        return this.executeWithQueryHandler(source);
     }
 
     private async handleGetMutateObjectType<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo, rootTypes: string[]): Promise<IntermediateResult> {
         const className = getDirectives(info.returnType).is['class'];
         const targetUrl = await context.resolver.resolve(className, new TargetResolverContext(this.ldpClient))
 
-        console.log(source);
         if (targetUrl.toString()) {
             source.subject = namedNode((args as any).id);
             source.quads = await getSubGraph(source.quads!, className, args as any);
@@ -80,7 +78,7 @@ export class MutationHandler {
                 // Append triples to doc using patch
                 await new LdpClient().patchDocument(targetUrl.toString(), null, source.quads);
         }
-        return source;
+        return this.executeWithQueryHandler(source);
 
     }
 
@@ -99,7 +97,7 @@ export class MutationHandler {
         store.removeQuads(deletes);
         store.addQuads(inserts);
         source.quads = store.getQuads(null, null, null, null);
-        return source;
+        return this.executeWithQueryHandler(source);
     }
 
     private getDirectives(type: GraphQLType | GraphQLField<any, any, any> | GraphQLInputField): Record<string, any> {
@@ -165,5 +163,9 @@ export class MutationHandler {
 
     private TODO() {
         alert('TODO');
+    }
+
+    private executeWithQueryHandler(source: IntermediateResult): IntermediateResult {
+        return {...source, queryOverride: true};
     }
 }

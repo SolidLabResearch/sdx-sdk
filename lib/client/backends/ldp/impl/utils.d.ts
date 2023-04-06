@@ -14,6 +14,7 @@ interface IntermediateResult {
     parentClassIri?: string;
     resourceType: ResourceType;
     subject?: NamedNode;
+    queryOverride?: boolean;
 }
 
 export { IntermediateResult, ResourceType, getDirectives, getGraph, getSubGraph, getSubGraphArray };
