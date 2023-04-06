@@ -1,5 +1,5 @@
-export { SolidLDPBackend, SolidLDPBackendOptions, SolidLDPContext, SolidTargetBackend, SolidTargetBackendContext } from './backends/ldp/solid-ldp-backend.js';
-export { StaticTargetResolver, TargetResolver, TargetResolverContext } from './backends/ldp/target-resolvers.js';
+export { SolidLDPBackend, SolidLDPBackendOptions, SolidLDPContext, SolidTargetBackend, SolidTargetBackendContext } from './client/backends/ldp/solid-ldp-backend.js';
+export { StaticTargetResolver, TargetResolver, TargetResolverContext } from './client/backends/ldp/target-resolvers.js';
 import 'graphql/jsutils/ObjMap';
 import 'graphql/execution/execute';
 import 'graphql/language/ast';
