@@ -85,8 +85,10 @@ export class ShaclReaderService {
         //     const txt = await axios.get(uri + '/' + entry);
         //     quads.push(...this.parser.parse(txt.data));
         // }
+        if(!this.primed) {
+            await this.primeCache(uri);
+        }
         
-
         const context = new Context(this._cache, this.generateObjectType);
 
         // Generate Schema

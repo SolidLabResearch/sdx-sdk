@@ -1,13 +1,4 @@
-describe('A basic SHACL file', () => {
-    it('should be parsed correctly', () => {
-        // Serve the shacl file with a mock structure (uri => shacl file)
-
-        // Compare output to desired output
-        expect(true).toBe(false);
-    });
-});
-
-const SHACL_EXAMPLE = `@prefix sh: <http://www.w3.org/ns/shacl#> .
+export const SHACL_EXAMPLE = `@prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix schema: <http://schema.org/> .
 @prefix ex: <http://example.org/> .

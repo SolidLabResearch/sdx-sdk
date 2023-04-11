@@ -1,6 +1,6 @@
 {
     "extends": "./tsconfig.json",
-    "include": ["__tests__/**/*"],
+    "include": ["test/**/*"],
     "files": ["node_modules/jest-extended/types/index.d.ts"],
     "exclude": ["node_modules"],
 }

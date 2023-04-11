@@ -4,7 +4,7 @@ const config: JestConfigWithTsJest = {
     preset: 'ts-jest',
     testEnvironment: 'node',
     moduleDirectories: ["node_modules", "src"],
-    testPathIgnorePatterns: ["__tests__/assets/", "globals.d.ts"],
+    testMatch: [ "<rootDir>/test/**/*.test.[jt]s?(x)" ],
     transform: {
         '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
     },
