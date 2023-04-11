@@ -1,5 +1,5 @@
 export interface SolidClientCredentials {
-    clientId: string;
-    clientSercret: string;
-    identityServerUrl: string;
+  clientId: string;
+  clientSercret: string;
+  identityServerUrl: string;
 }
