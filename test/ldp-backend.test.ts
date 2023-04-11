@@ -1,5 +1,4 @@
-import { SolidLDPContext, StaticTargetResolver, TargetResolverContext } from "../src";
-import { LdpClient } from "../src/commons";
+import { SolidLDPContext, StaticTargetResolver } from "../src";
 
 
 describe('SolidLDPContext', () => {
@@ -17,9 +16,8 @@ describe('SolidLDPContext', () => {
 describe("StaticTargetResolver", () => {
     it("always resolves to a set URI", async () => {
         const staticUri = new URL("http://example.com");
-        const context = new TargetResolverContext(new LdpClient());
         const resolver = new StaticTargetResolver(staticUri.toString());
-        expect((await resolver.resolve('http://uri1.com#ClassName1', context)).toString()).toEqual(staticUri.toString());
-        expect((await resolver.resolve('http://uri2.com#somePredicate', context)).toString()).toEqual(staticUri.toString());
+        expect((await resolver.resolve()).toString()).toEqual(staticUri.toString());
+        expect((await resolver.resolve()).toString()).toEqual(staticUri.toString());
     });
 });
