@@ -1,14 +1,14 @@
 import '../src/polyfills';
-import { ShaclReaderService } from "../src/parse";
+import { ShaclReaderService } from '../src/parse';
 
 import axios from 'axios';
 import { GraphQLSchema } from 'graphql';
-import { SHACL_EXAMPLE } from "./assets/examples";
+import { SHACL_EXAMPLE } from './assets/examples';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-mockedAxios.get.mockImplementation(uri => {
+mockedAxios.get.mockImplementation((uri) => {
   if (uri.endsWith('/index.json')) {
     return Promise.resolve({ data: { entries: ['oneHash'] } });
   } else {
@@ -36,10 +36,13 @@ describe('A SchaclReaderService', () => {
       expect(directives.length).toBe(3);
       expect(directives).toIncludeAllPartialMembers([
         { name: 'is', locations: ['OBJECT', 'INPUT_OBJECT'] },
-        { name: 'property', locations: ['FIELD_DEFINITION', 'INPUT_FIELD_DEFINITION'] },
+        {
+          name: 'property',
+          locations: ['FIELD_DEFINITION', 'INPUT_FIELD_DEFINITION']
+        },
         { name: 'identifier', locations: ['FIELD_DEFINITION'] }
       ]);
-    })
+    });
 
     it('has a Query entrypoint', async () => {
       const schema = await schemaPromise;
@@ -61,7 +64,7 @@ describe('A SchaclReaderService', () => {
         { name: 'contact' },
         { name: 'contactCollection' },
         { name: 'organization' },
-        { name: 'organizationCollection' },
+        { name: 'organizationCollection' }
       ]);
     });
 

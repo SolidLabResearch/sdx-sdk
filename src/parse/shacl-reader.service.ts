@@ -24,9 +24,9 @@ import {
 } from 'graphql';
 import { Parser, Quad } from 'n3';
 import { autoInjectable, singleton } from 'tsyringe';
+import { utils } from '../commons';
 import { Context } from './context';
 import { PropertyShape, Shape } from './model';
-import { utils } from '../commons';
 
 // const { namedNode } = DataFactory;
 
@@ -110,6 +110,7 @@ export class ShaclReaderService {
     //     const txt = await axios.get(uri + '/' + entry);
     //     quads.push(...this.parser.parse(txt.data));
     // }
+
     if (!this.primed) {
       await this.primeCache(uri);
     }
