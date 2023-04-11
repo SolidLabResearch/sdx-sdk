@@ -1,4 +1,4 @@
-import { GraphQLEnumType, GraphQLInputObjectType, GraphQLInterfaceType, GraphQLNonNull, GraphQLNullableType, GraphQLObjectType, GraphQLOutputType, GraphQLScalarType, GraphQLType, GraphQLUnionType, isListType, isNonNullType, isObjectType, isScalarType } from "graphql";
+import { GraphQLEnumType, GraphQLInputObjectType, GraphQLInterfaceType, GraphQLObjectType, GraphQLOutputType, GraphQLScalarType, GraphQLType, GraphQLUnionType, isListType, isNonNullType, isObjectType, isScalarType } from "graphql";
 import { GraphQLInputType } from "graphql/type/definition";
 import { Quad, Quad_Subject, Store } from "n3";
 
@@ -23,7 +23,7 @@ export function printQuads(quads: Quad[] | Store, label?: string) {
     if (label) {
         console.log(`${label} ==> `)
     }
-    let q = (quads) instanceof Array ? quads : quads.getQuads(null, null, null, null);
+    const q = (quads) instanceof Array ? quads : quads.getQuads(null, null, null, null);
     q.forEach(q => console.log(`[${q.subject.value} ${q.predicate.value} ${q.object.value}]`));
 }
 

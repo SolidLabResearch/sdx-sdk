@@ -73,7 +73,7 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     }
 
     private fieldResolver = async <TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo): Promise<unknown> => {
-        const { schema, operation } = info;
+        const { operation } = info;
         // setup intermediate result
         source = source ?? {
             quads: [],
@@ -96,4 +96,5 @@ export interface SolidTargetBackend<C extends SolidTargetBackendContext, E = unk
     requester: <R, V>(doc: DocumentNode, vars?: V, context?: C) => Promise<ExecutionResult<R, E>>;
 }
 
-export interface SolidTargetBackendContext { };
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface SolidTargetBackendContext { }

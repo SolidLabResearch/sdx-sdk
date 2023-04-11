@@ -13,7 +13,7 @@ export class QueryHandler {
     }
 
     async handleQuery<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo, rootTypes: string[]): Promise<IntermediateResult | unknown> {
-        const { returnType, schema, fieldName, parentType, fieldNodes, path, rootValue, operation } = info;
+        const { returnType, fieldName, parentType } = info;
         if (rootTypes.includes(parentType.name)) {
             const className = getDirectives(returnType).is['class'] as string;
             const targetUrl = await context.resolver.resolve(className, new TargetResolverContext(this.ldpClient))

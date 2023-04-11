@@ -4,8 +4,10 @@ import { vocab } from "../../../../commons";
 import axios from "axios";
 import { GraphQLField, GraphQLInputField, GraphQLType, isListType, isNonNullType, isScalarType } from "graphql";
 
-const { namedNode, literal, defaultGraph, quad } = DataFactory;
+const { namedNode } = DataFactory;
 
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function getSubGraphArray(source: Quad[], className: string, args: Record<string, any>): Promise<Quad[][]> {
     const store = new Store(source);
     // TODO: generate subgraphs based on sub in [sub ?className ? ?]
@@ -49,7 +51,7 @@ export function getDirectives(type: GraphQLType | GraphQLField<any, any, any> | 
 }
 
 
-export enum ResourceType { CONTAINER, DOCUMENT };
+export enum ResourceType { CONTAINER, DOCUMENT }
 
 export interface IntermediateResult {
     quads: Quad[];

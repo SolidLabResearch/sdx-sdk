@@ -19,8 +19,6 @@ export class StaticTargetResolver implements TargetResolver {
         }
     }
 
-    resolve = async (classIri: string, context: TargetResolverContext): Promise<URL> => {
-        return this.target
-    }
+    resolve = async (): Promise<URL> => this.target
 
 }

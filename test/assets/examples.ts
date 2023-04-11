@@ -81,7 +81,7 @@ ex:Organization
                     sh:maxCount 1;
                 ].`;
 
-const GQL_SCHEMA = `
+export const GQL_SCHEMA = `
 schema {
     query: Query
     mutation: Mutation

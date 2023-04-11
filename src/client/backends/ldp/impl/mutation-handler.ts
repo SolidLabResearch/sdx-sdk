@@ -26,8 +26,8 @@ export class MutationHandler {
         }
         if (fieldName === "delete") return this.handleDeleteMutation(source, args, context, info);
         if (fieldName === "update") return this.handleUpdateMutation(source, args, context, info);
-        if (fieldName.startsWith("create")) return this.handleCreateMutation(source, args, context, info, rootTypes);
-        if (fieldName.startsWith("mutate")) return this.handleGetMutateObjectType(source, args, context, info, rootTypes);
+        if (fieldName.startsWith("create")) return this.handleCreateMutation(source, args, context, info,);
+        if (fieldName.startsWith("mutate")) return this.handleGetMutateObjectType(source, args, context, info);
         if (fieldName.startsWith("set")) return this.TODO();
         if (fieldName.startsWith("clear")) return this.TODO();
         if (fieldName.startsWith("add")) return this.TODO();
@@ -39,7 +39,7 @@ export class MutationHandler {
     }
 
 
-    private async handleCreateMutation<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo, rootTypes: string[]): Promise<IntermediateResult> {
+    private async handleCreateMutation<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo): Promise<IntermediateResult> {
         const className = this.getDirectives(info.returnType).is['class'];
         const targetUrl = await context.resolver.resolve(className, new TargetResolverContext(this.ldpClient))
         // Create mutations should always have an input argument.
@@ -55,7 +55,7 @@ export class MutationHandler {
         return this.executeWithQueryHandler(source);
     }
 
-    private async handleGetMutateObjectType<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo, rootTypes: string[]): Promise<IntermediateResult> {
+    private async handleGetMutateObjectType<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo): Promise<IntermediateResult> {
         const className = getDirectives(info.returnType).is['class'];
         const targetUrl = await context.resolver.resolve(className, new TargetResolverContext(this.ldpClient))
 
@@ -69,6 +69,8 @@ export class MutationHandler {
         }
     }
 
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private async handleDeleteMutation<TArgs>(source: IntermediateResult, args: TArgs, context: SolidLDPContext, info: GraphQLResolveInfo): Promise<IntermediateResult> {
         console.log('DELETE MUTATION');
         const targetUrl = await context.resolver.resolve(source.parentClassIri!, new TargetResolverContext(this.ldpClient))

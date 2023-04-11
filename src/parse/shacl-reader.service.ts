@@ -1,12 +1,12 @@
 import axios from 'axios';
 import { DirectiveLocation, GraphQLDirective, GraphQLField, GraphQLFieldConfig, GraphQLID, GraphQLInputField, GraphQLInputFieldConfig, GraphQLInputObjectType, GraphQLInputType, GraphQLList, GraphQLNonNull, GraphQLObjectType, GraphQLObjectTypeConfig, GraphQLOutputType, GraphQLSchema, GraphQLString, GraphQLType, isListType, isNonNullType, specifiedScalarTypes, ThunkObjMap } from "graphql";
-import { DataFactory, Parser, Quad } from 'n3';
+import { Parser, Quad } from 'n3';
 import { autoInjectable, singleton } from "tsyringe";
 import { Context } from './context';
 import { PropertyShape, Shape } from "./model";
 import { utils } from '../commons';
 
-const { namedNode } = DataFactory;
+// const { namedNode } = DataFactory;
 
 const ID_FIELD: { 'id': GraphQLFieldConfig<any, any> } = {
     id: {
@@ -70,7 +70,7 @@ export class ShaclReaderService {
     async primeCache(uri: string) {
         const response = await axios.get<{ entries: string[] }>(uri + '/index.json');
         this._cache = [];
-        for (let entry of response.data.entries) {
+        for (const entry of response.data.entries) {
             const txt = await axios.get(uri + '/' + entry);
             this._cache.push(...this.parser.parse(txt.data));
         }
@@ -88,7 +88,7 @@ export class ShaclReaderService {
         if(!this.primed) {
             await this.primeCache(uri);
         }
-        
+
         const context = new Context(this._cache, this.generateObjectType);
 
         // Generate Schema
@@ -164,8 +164,8 @@ export class ShaclReaderService {
         let inputType = context.getInputTypes().find(type => name === type.name);
         if (!inputType) {
             let fields = Object.fromEntries(Object.entries(type.getFields())
-                .filter(([_, field]) => utils.isOrContainsScalar(field.type))
-                .filter(([_, field]) => !isIdentifier(field))
+                .filter(([, field]) => utils.isOrContainsScalar(field.type))
+                .filter(([, field]) => !isIdentifier(field))
                 .map(([name, field]) => [name, toInputField(field, mutationType)]));
             if (mutationType === 'create') {
                 fields = {
@@ -206,7 +206,7 @@ export class ShaclReaderService {
      */
     private generateMutationObjectTypeFields(type: GraphQLObjectType, context: Context): ThunkObjMap<GraphQLFieldConfig<any, any>> {
         // Delete operation is always present
-        let fields: ThunkObjMap<GraphQLFieldConfig<any, any>> = {
+        const fields: ThunkObjMap<GraphQLFieldConfig<any, any>> = {
             delete: { type: new GraphQLNonNull(type) }
         }
 
@@ -219,7 +219,7 @@ export class ShaclReaderService {
             };
         }
 
-        // Add opreations for other non-scalar fields
+        // Add operations for other non-scalar fields
         const extra = Object.values(type.getFields()).reduce((acc, field) => {
             if (utils.isOrContainsObjectType(field.type)) {
                 const isListLike = isListType(field.type) || (isNonNullType(field.type) && isListType(field.type.ofType));
@@ -345,10 +345,6 @@ export class ShaclReaderService {
             },
         });
     }
-}
-
-const enum ERROR {
-    NO_SHACL_SCHEMAS = `No shacl schema's`
 }
 
 function toInputField(field: GraphQLField<any, any>, mutationType: 'create' | 'update'): GraphQLInputFieldConfig {
