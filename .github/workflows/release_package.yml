@@ -5,13 +5,25 @@ on:
       release-type:
         description: 'Release type (one of): patch, minor, major, prepatch, preminor, premajor, prerelease'
         required: true
+
+env:
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - name: GH_TOKEN
+        if: env.GH_TOKEN == ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "GH_TOKEN=${GITHUB_TOKEN}" >> $GITHUB_ENV
       # Checkout project repository
       - name: Checkout
         uses: actions/checkout@v2.3.4
+        with:
+          ref: main
+          token: ${{ env.GH_TOKEN }}
 
       # Setup Node.js environment
       - name: Setup Node.js
@@ -83,7 +95,7 @@ jobs:
       # Push repository changes
       - name: Push changes to repository
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT }}
+          GITHUB_TOKEN: ${{ env.GH_TOKEN }}
         run: |
           git push origin && git push --tags
 
@@ -104,4 +116,4 @@ jobs:
           body: ${{ steps.get-changelog.outputs.changelog }}
           prerelease: ${{ startsWith(github.event.inputs.release-type, 'pre') }}
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT }}
+          GITHUB_TOKEN: ${{ env.GH_TOKEN }}
