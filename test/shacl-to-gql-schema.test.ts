@@ -12,7 +12,7 @@ import {
   GraphQLSchema,
   GraphQLString
 } from 'graphql';
-import { decapitalize } from '../lib/commons/util';
+import { decapitalize } from '../src/commons/util';
 import { capitalize } from '../src/commons/util';
 import { ShaclReaderService } from '../src/parse';
 import { SHACL_EXAMPLE } from './assets/examples';
