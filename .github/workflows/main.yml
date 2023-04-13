@@ -29,6 +29,7 @@ jobs:
         operating-system:
           - ubuntu-latest
           - windows-latest
+        node-version:
           - '18.0'
           - '18.x'
           - '19.x'
