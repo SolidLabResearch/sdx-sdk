@@ -1,6 +1,6 @@
 {
   "name": "@solidlab/sdx-sdk",
-  "version": "1.0.0-beta.3",
+  "version": "1.0.0-beta.4",
   "description": "Solid Development Experience SDK library",
   "main": "./dist/index.js",
   "module": "./dist/index.cjs",
