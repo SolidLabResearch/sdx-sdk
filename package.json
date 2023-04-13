@@ -1,6 +1,6 @@
 {
   "name": "sdx-sdk",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Solid Development Experience SDK library",
   "main": "./dist/index.js",
   "module": "./dist/index.cjs",
