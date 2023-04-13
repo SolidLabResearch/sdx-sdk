@@ -1,5 +1,5 @@
 {
-  "name": "sdx-sdk",
+  "name": "@solidlab/sdx-sdk",
   "version": "0.0.0",
   "description": "Solid Development Experience SDK library",
   "main": "./dist/index.js",
@@ -60,5 +60,8 @@
     "ts-node": "^10.9.1",
     "tsup": "^6.6.3",
     "typescript": "^4.9.5"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
