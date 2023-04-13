@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_requests:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3.5.1
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+  
+  test:
+    needs: lint
+    runs-on: ${{ matrix.operating-system }}
+    strategy:
+      matrix:
+        operating-system:
+          - ubuntu-latest
+          - windows-latest
+          - '18.0'
+          - '18.x'
+          - '19.x'
+    timeout-minutes: 10
+    steps:
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Ensure line endings are consistent
+        run: git config --global core.autocrlf input
+      - name: Check out repository
+        uses: actions/checkout@v3.5.1
+      - name: Install dependencies and run build scripts
+        run: npm ci
+      - name: Run unit tests
+        run: npm run test
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3.5.1
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+      - run: npm ci
+      - run: npm run build
+    
