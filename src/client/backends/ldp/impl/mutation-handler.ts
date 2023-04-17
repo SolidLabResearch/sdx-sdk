@@ -119,7 +119,7 @@ export class MutationHandler {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   private async handleDeleteMutation<TArgs>(
     source: IntermediateResult,
     args: TArgs,
@@ -142,6 +142,7 @@ export class MutationHandler {
     }
     return this.executeWithQueryHandler(source);
   }
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   private async handleUpdateMutation<TArgs>(
     source: IntermediateResult,

@@ -13,7 +13,7 @@ import {
 
 const { namedNode } = DataFactory;
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+/* eslint-disable @typescript-eslint/no-unused-vars */
 export async function getSubGraphArray(
   source: Quad[],
   className: string,
@@ -28,6 +28,7 @@ export async function getSubGraphArray(
     );
   return Promise.all(quadsOfQuads);
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 export async function getSubGraph(
   source: Quad[],

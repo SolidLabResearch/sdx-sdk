@@ -1,6 +1,7 @@
 import '../src/polyfills';
 
 import axios from 'axios';
+import { readFile } from 'fs/promises';
 import {
   GraphQLField,
   GraphQLID,
@@ -12,19 +13,18 @@ import {
   GraphQLSchema,
   GraphQLString
 } from 'graphql';
-import { decapitalize } from '../src/commons/util';
-import { capitalize } from '../src/commons/util';
+import { capitalize, decapitalize } from '../src/commons/util';
 import { ShaclReaderService } from '../src/parse';
-import { SHACL_EXAMPLE } from './assets/examples';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-mockedAxios.get.mockImplementation((uri) => {
+mockedAxios.get.mockImplementation(async (uri) => {
   if (uri.endsWith('/index.json')) {
-    return Promise.resolve({ data: { entries: ['oneHash'] } });
+    return { data: { entries: ['oneHash'] } };
   } else {
-    return Promise.resolve({ data: SHACL_EXAMPLE });
+    const shacl = await readFile('test/assets/shacl/contacts_shacl.ttl');
+    return { data: shacl.toString() };
   }
 });
 
