@@ -3,8 +3,8 @@ import type { Options } from 'tsup';
 const env = process.env.NODE_ENV;
 
 export const tsup: Options = {
-  splitting: true,
-  clean: env === 'production', // clean up the dist folder
+  splitting: false,
+  clean: true, // clean up the dist folder
   dts: true, // generate dts files
   format: ['cjs', 'esm'], // generate cjs and esm files
   minify: env === 'production',
