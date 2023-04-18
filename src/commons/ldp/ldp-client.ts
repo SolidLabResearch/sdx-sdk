@@ -1,5 +1,5 @@
 import { AxiosResponse, patch } from 'axios';
-import { Quad, Writer } from 'n3';
+import { type Quad, Writer } from 'n3';
 import { SolidClientCredentials } from '../auth/solid-client-credentials';
 
 export class LdpClient {
