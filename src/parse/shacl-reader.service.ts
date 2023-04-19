@@ -104,25 +104,22 @@ export class ShaclReaderService {
   }
 
   async parseSHACLs(uri: string): Promise<GraphQLSchema> {
-    // const response = await axios.get<{ entries: string[] }>(uri + '/index.json');
-    // const quads: Quad[] = [];
-    // for (let entry of response.data.entries) {
-    //     const txt = await axios.get(uri + '/' + entry);
-    //     quads.push(...this.parser.parse(txt.data));
-    // }
-
     if (!this.primed) {
+      console.time('Prime schema cache');
       await this.primeCache(uri);
+      console.timeEnd('Prime schema cache');
     }
-
+    console.time('Parse SHACL to schema');
     const context = new Context(this._cache, this.generateObjectType);
 
     // Generate Schema
-    return new GraphQLSchema({
+    const schema = new GraphQLSchema({
       query: this.generateEntryPoints(context.getGraphQLObjectTypes()),
       mutation: this.generateMutationEntryPoints(context),
       directives: [IS_DIRECTIVE, PROPERTY_DIRECTIVE, IDENTIFIER_DIRECTIVE]
     });
+    console.timeEnd('Parse SHACL to schema');
+    return schema;
   }
 
   /**

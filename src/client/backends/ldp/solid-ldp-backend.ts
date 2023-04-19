@@ -21,7 +21,6 @@ export class SolidLDPContext implements SolidTargetBackendContext {
   constructor(staticUrl: string);
   constructor(resolver: TargetResolver);
   constructor(staticUrlOrResolver: TargetResolver | string) {
-    console.log('YESHYES');
     if (typeof staticUrlOrResolver === 'string') {
       this.resolver = new StaticTargetResolver(staticUrlOrResolver);
     } else {
@@ -42,16 +41,17 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
   private queryHandler: QueryHandler;
   private mutationHandler: MutationHandler;
   private rootTypes: string[] = [];
+  private parser: ShaclReaderService;
 
   constructor(options?: SolidLDPBackendOptions) {
     // TODO: Use schema to parse, instead of SHACL files
     // Default to generated schema location
-    logger.debug(() => 'CALLED!!!!!');
     this.schemaFile = options?.schemaFile || URI_SDX_GENERATE_GRAPHQL_SCHEMA;
     this.defaultContext = options?.defaultContext;
     const ldpClient = new LdpClient(options?.clientCredentials);
     this.queryHandler = new QueryHandler(ldpClient);
     this.mutationHandler = new MutationHandler(ldpClient);
+    this.parser = new ShaclReaderService();
   }
 
   requester = async <R, V>(
@@ -60,20 +60,10 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     context?: SolidLDPContext
   ): Promise<ExecutionResult<R>> => {
     // If no options, try setting a default context as options
-    logger.debug(() => 'CALLED REQUEST!!!!!');
     context = context ?? this.defaultContext;
-    const parser = new ShaclReaderService();
-    console.log('test');
     const query = print(doc);
-    if (!parser.primed) {
-      console.time('Prime schema cache');
-      await parser.primeCache(URI_SDX_GENERATE_SHACL_FOLDER);
-      console.timeEnd('Prime schema cache');
-    }
+    const schema = await this.parser.parseSHACLs(URI_SDX_GENERATE_SHACL_FOLDER);
 
-    console.time('Parse SHACL to schema');
-    const schema = await parser.parseSHACLs(URI_SDX_GENERATE_SHACL_FOLDER);
-    console.timeEnd('Parse SHACL to schema');
     this.rootTypes = [
       schema.getQueryType()?.name,
       schema.getMutationType()?.name,
@@ -89,7 +79,6 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
       fieldResolver: this.fieldResolver
     });
     console.timeEnd('Execute query');
-    // console.log(result.errors)
     return result as ExecutionResult<R>;
   };
 

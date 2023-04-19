@@ -1,5 +1,5 @@
-import { AxiosResponse, patch } from 'axios';
-import { type Quad, Writer } from 'n3';
+import axios, { AxiosResponse } from 'axios';
+import { Quad, Writer } from 'n3';
 import { SolidClientCredentials } from '../auth/solid-client-credentials';
 
 export class LdpClient {
@@ -42,7 +42,7 @@ export class LdpClient {
       [n3Inserts, n3Deletes].filter((item) => item != null).join(';') + '.';
     const requestBody = `@prefix solid: <http://www.w3.org/ns/solid/terms#>.\n_:rename a solid:InsertDeletePatch;\n${patchContent}`;
 
-    const resp = await patch(url, requestBody, {
+    const resp = await axios.patch(url, requestBody, {
       headers: {
         'Content-Type': 'text/n3'
       }
