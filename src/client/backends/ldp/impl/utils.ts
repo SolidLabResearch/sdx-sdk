@@ -37,12 +37,15 @@ export async function getSubGraph(
 ): Promise<Quad[]> {
   const store = new Store(source);
   const id = args?.id;
-  let topQuads = store
+  const topQuads = store
     .getSubjects(vocab.RDFS.a, namedNode(className), null)
-    .flatMap((sub) => store.getQuads(sub, null, null, null));
-  if (id) {
-    topQuads = topQuads.filter((quad) => quad.subject.value === id);
-  }
+    .flatMap((sub) => {
+      if (id) {
+        return sub.value === id ? store.getQuads(sub, null, null, null) : [];
+      } else {
+        return store.getQuads(sub, null, null, null);
+      }
+    });
   const follow = (quads: Quad[], store: Store): Quad[] => {
     return quads.reduce(
       (acc, quad) =>
@@ -62,7 +65,6 @@ export async function getSubGraph(
 
 export async function getGraph(location: string): Promise<Quad[]> {
   const doc = await axios.get(location);
-  // console.log(doc.data)
   return new Parser().parse(doc.data);
 }
 
