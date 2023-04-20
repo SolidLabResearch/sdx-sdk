@@ -54,7 +54,8 @@ export class MutationHandler {
       return this.handleCreateMutation(source, args, context, info);
     if (fieldName.startsWith('mutate'))
       return this.handleGetMutateObjectType(source, args, context, info);
-    if (fieldName.startsWith('set')) return this.TODO();
+    if (fieldName.startsWith('set'))
+      return this.handleSetMutation(source, args, context, info);
     if (fieldName.startsWith('clear')) return this.TODO();
     if (fieldName.startsWith('add')) return this.TODO();
     if (fieldName.startsWith('remove')) return this.TODO();
@@ -158,6 +159,47 @@ export class MutationHandler {
       new TargetResolverContext(this.ldpClient)
     );
     const input = (args as any).input;
+    const { inserts, deletes } = this.generateTriplesForUpdate(
+      source.quads!,
+      input,
+      source.subject!,
+      returnType
+    );
+    switch (source.resourceType!) {
+      case ResourceType.DOCUMENT:
+        // Update triples in doc using patch
+        await new LdpClient().patchDocument(
+          targetUrl.toString(),
+          inserts,
+          deletes
+        );
+    }
+    // Reconstruct object
+    const store = new Store(source.quads);
+    store.removeQuads(deletes);
+    store.addQuads(inserts);
+    source.quads = store.getQuads(null, null, null, null);
+    return this.executeWithQueryHandler(source);
+  }
+
+  private async handleSetMutation<TArgs>(
+    source: IntermediateResult,
+    args: TArgs,
+    context: SolidLDPContext,
+    info: GraphQLResolveInfo
+  ): Promise<IntermediateResult> {
+    const returnType = info.schema.getType(
+      utils.unwrapNonNull(info.returnType).toString()
+    ) as GraphQLObjectType;
+    const targetUrl = await context.resolver.resolve(
+      source.parentClassIri!,
+      new TargetResolverContext(this.ldpClient)
+    );
+    const input = (args as any).input;
+
+    // Generate triples for creation
+
+    // Generate triples for setting
     const { inserts, deletes } = this.generateTriplesForUpdate(
       source.quads!,
       input,

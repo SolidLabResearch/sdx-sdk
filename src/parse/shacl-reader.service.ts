@@ -342,7 +342,6 @@ export class ShaclReaderService {
         type: returnType,
         args: { id: { type: new GraphQLNonNull(GraphQLID) } }
       },
-
       [unlinkName]: {
         type: returnType,
         args: { id: { type: new GraphQLNonNull(GraphQLID) } }
@@ -364,6 +363,8 @@ export class ShaclReaderService {
   ): ThunkObjMap<GraphQLFieldConfig<any, any>> {
     const setName = `set${utils.capitalize(field.name)}`;
     const clearName = `clear${utils.capitalize(field.name)}`;
+    const linkName = `link${utils.capitalize(field.name)}`;
+    const unlinkName = `unlink${utils.capitalize(field.name)}`;
     const returnType = new GraphQLNonNull(parentType);
     const fieldType = utils.toActualType(field.type) as GraphQLObjectType;
     return {
@@ -384,6 +385,14 @@ export class ShaclReaderService {
       },
       [clearName]: {
         type: returnType
+      },
+      [linkName]: {
+        type: returnType,
+        args: { id: { type: new GraphQLNonNull(GraphQLID) } }
+      },
+      [unlinkName]: {
+        type: returnType,
+        args: { id: { type: new GraphQLNonNull(GraphQLID) } }
       }
     };
   }

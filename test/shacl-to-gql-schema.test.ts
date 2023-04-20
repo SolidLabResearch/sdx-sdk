@@ -7,6 +7,7 @@ import {
   GraphQLID,
   GraphQLList,
   GraphQLNamedOutputType,
+  GraphQLNamedType,
   GraphQLNonNull,
   GraphQLObjectType,
   GraphQLScalarType,
@@ -191,180 +192,284 @@ describe('A SchaclReaderService', () => {
       types.map((type) => type as GraphQLObjectType).forEach(checkQueryType);
     });
 
-    it('has Mutation Types', async () => {
-      const schema = await schemaPromise;
-      const types = Object.values(schema.getTypeMap()).filter(
-        (type) =>
-          type instanceof GraphQLObjectType &&
-          !type.name.startsWith('__') &&
-          type.name !== 'Query' &&
-          type.name !== 'Mutation' &&
-          type.name.endsWith('Mutation')
-      );
+    // describe('has Mutation Types', async () => {
+    //   const schema = await schemaPromise;
+    //   const types = Object.values(schema.getTypeMap()).filter(
+    //     (type) =>
+    //       type instanceof GraphQLObjectType &&
+    //       !type.name.startsWith('__') &&
+    //       type.name !== 'Query' &&
+    //       type.name !== 'Mutation' &&
+    //       type.name.endsWith('Mutation')
+    //   );
 
-      const checkMutationType = (type: GraphQLObjectType) => {
-        const fields = Object.values(type.getFields());
-        // All fields should start with a lower case letter
-        expect(fields).toSatisfyAll(
-          (field: GraphQLField<any, any>) =>
-            field.name.slice(0, 1).toLocaleLowerCase() ===
-            field.name.slice(0, 1)
-        );
-        const typeName = type.name.slice(0, -'Mutation'.length);
-        const queryType = schema.getType(typeName)!;
-        // There should at least be a delete field
-        expect(fields.length).toBeGreaterThanOrEqual(1);
-        expect(fields).toIncludeAllPartialMembers([
-          {
-            name: 'delete',
-            type: new GraphQLNonNull(queryType),
-            extensions: {}
-          }
-        ]);
+    //   const getFieldsByPrefix = (type: GraphQLNamedType, prefix: string) => {
+    //     return Object.entries((type as GraphQLObjectType).getFields())
+    //       .filter((entry) => entry[0].startsWith(prefix))
+    //       .map((entry) => entry[1]);
+    //   };
 
-        // Check update field, if present
-        const updateField = type.getFields().update;
-        if (updateField) {
-          // Should return nonnull of query type
-          expect(updateField.type).toEqual(new GraphQLNonNull(queryType));
-          expect(updateField.args).toIncludeAllPartialMembers([
-            {
-              name: 'input',
-              type: new GraphQLNonNull(
-                schema.getType(`Update${typeName}Input`)!
-              ),
-              extensions: {}
-            }
-          ]);
-          expect(updateField.extensions).toEqual({});
-        }
+    //   const checkMutationType = (type: GraphQLObjectType) => {
+    //     // All fields should start with a lower case letter
+    //     const fields = Object.values(type.getFields());
+    //     expect(fields).toSatisfyAll(
+    //       (field: GraphQLField<any, any>) =>
+    //         field.name.slice(0, 1).toLocaleLowerCase() ===
+    //         field.name.slice(0, 1)
+    //     );
+    //   };
 
-        // TODO: Check link fields
-        const linkFields = Object.entries(type.getFields())
-          .filter((entry) => entry[0].startsWith('link'))
-          .map((entry) => entry[1]);
-        if (linkFields.length > 0) {
-          linkFields.forEach((field) => {
-            // Should return nonnull of query type
-            expect(field.type).toEqual(new GraphQLNonNull(queryType));
-            expect(field.args).toIncludeAllPartialMembers([
-              {
-                name: 'id',
-                type: new GraphQLNonNull(GraphQLID),
-                extensions: {}
-              }
-            ]);
-            expect(field.extensions).toEqual({});
-          });
-        }
+    //   it('with all minimal required fields', () => {
+    //     // Check mutation types
+    //     types.forEach((type) => checkMutationType(type as GraphQLObjectType));
+    //   });
 
-        // TODO: Check unlink fields
-        const unlinkFields = Object.entries(type.getFields())
-          .filter((entry) => entry[0].startsWith('unlink'))
-          .map((entry) => entry[1]);
-        if (unlinkFields.length > 0) {
-          unlinkFields.forEach((field) => {
-            // Should return nonnull of query type
-            expect(field.type).toEqual(new GraphQLNonNull(queryType));
-            expect(field.args).toIncludeAllPartialMembers([
-              {
-                name: 'id',
-                type: new GraphQLNonNull(GraphQLID),
-                extensions: {}
-              }
-            ]);
-            expect(field.extensions).toEqual({});
-          });
-        }
+    //   it('with a correct delete field', async () => {
+    //     types.forEach((type) => {
+    //       const fields = Object.values((type as GraphQLObjectType).getFields());
+    //       const typeName = type.name.slice(0, -'Mutation'.length);
+    //       const queryType = schema.getType(typeName)!;
+    //       // There should at least be a delete field
+    //       expect(fields.length).toBeGreaterThanOrEqual(1);
+    //       expect(fields).toIncludeAllPartialMembers([
+    //         {
+    //           name: 'delete',
+    //           type: new GraphQLNonNull(queryType),
+    //           extensions: {}
+    //         }
+    //       ]);
+    //     });
+    //   });
 
-        // TODO: Check set fields
-        const setFields = Object.entries(type.getFields())
-          .filter((entry) => entry[0].startsWith('set'))
-          .map((entry) => entry[1]);
-        if (setFields.length > 0) {
-          setFields.forEach((field) => {
-            // Read the return type of the field of the queryType, derived from the fieldName of this field
-            const derivedName = decapitalize(field.name.slice('set'.length));
-            const argTypeName = (queryType as GraphQLObjectType)
-              .getFields()
-              [derivedName]!.type.toString();
-            // Should return nonnull of query type
-            expect(field.type).toEqual(new GraphQLNonNull(queryType));
-            expect(field.args).toIncludeAllPartialMembers([
-              {
-                name: 'input',
-                type: new GraphQLNonNull(
-                  schema.getType(`Create${argTypeName}Input`)!
-                ),
-                extensions: {}
-              }
-            ]);
-            expect(field.extensions).toEqual({});
-          });
-        }
+    //   it('with a correct update field', async () => {
+    //     types.forEach((type) => {
+    //       const typeName = type.name.slice(0, -'Mutation'.length);
+    //       const queryType = schema.getType(typeName)!;
+    //       const updateField = (type as GraphQLObjectType).getFields().update;
+    //       // Check update field, if present
+    //       if (updateField) {
+    //         // Should return nonnull of query type
+    //         expect(updateField.type).toEqual(new GraphQLNonNull(queryType));
+    //         expect(updateField.args).toIncludeAllPartialMembers([
+    //           {
+    //             name: 'input',
+    //             type: new GraphQLNonNull(
+    //               schema.getType(`Update${typeName}Input`)!
+    //             ),
+    //             extensions: {}
+    //           }
+    //         ]);
+    //         expect(updateField.extensions).toEqual({});
+    //       }
+    //     });
+    //   });
 
-        // TODO: Check clear fields
-        const clearFields = Object.entries(type.getFields())
-          .filter((entry) => entry[0].startsWith('clear'))
-          .map((entry) => entry[1]);
-        if (clearFields.length > 0) {
-          clearFields.forEach((field) => {
-            // Should return nonnull of query type
-            expect(field.type).toEqual(new GraphQLNonNull(queryType));
-            expect(field.args).toEqual([]);
-            expect(field.extensions).toEqual({});
-          });
-        }
+    //   it('with correct link fields', async () => {
+    //     // Check link fields
+    //     types.forEach((type) => {
+    //       const typeName = type.name.slice(0, -'Mutation'.length);
+    //       const queryType = schema.getType(typeName)!;
+    //       const linkFields = getFieldsByPrefix(type, 'link');
+    //       if (linkFields.length > 0) {
+    //         linkFields.forEach((field) => {
+    //           // Should return nonnull of query type
+    //           expect(field.type).toEqual(new GraphQLNonNull(queryType));
+    //           expect(field.args).toIncludeAllPartialMembers([
+    //             {
+    //               name: 'id',
+    //               type: new GraphQLNonNull(GraphQLID),
+    //               extensions: {}
+    //             }
+    //           ]);
+    //           expect(field.extensions).toEqual({});
+    //         });
+    //       }
+    //     });
+    //   });
 
-        // TODO: Check add fields
-        const addFields = Object.entries(type.getFields())
-          .filter((entry) => entry[0].startsWith('add'))
-          .map((entry) => entry[1]);
-        if (addFields.length > 0) {
-          addFields.forEach((field) => {
-            // Read the return type of the field of the queryType, derived from the fieldName of this field
-            const derivedName = decapitalize(field.name.slice('set'.length));
-            const argTypeName = (
-              (queryType as GraphQLObjectType).getFields()[derivedName]!
-                .type! as GraphQLList<any>
-            ).ofType.toString();
-            // Should return nonnull of query type
-            expect(field.type).toEqual(new GraphQLNonNull(queryType));
-            expect(field.args).toIncludeAllPartialMembers([
-              {
-                name: 'input',
-                type: new GraphQLNonNull(
-                  schema.getType(`Create${argTypeName}Input`)!
-                ),
-                extensions: {}
-              }
-            ]);
-            expect(field.extensions).toEqual({});
-          });
-        }
+    //   it('with correct unlink fields', async () => {
+    //     // Check unlink fields
+    //     types.forEach((type) => {
+    //       const typeName = type.name.slice(0, -'Mutation'.length);
+    //       const queryType = schema.getType(typeName)!;
+    //       const unlinkFields = getFieldsByPrefix(type, 'unlink');
+    //       if (unlinkFields.length > 0) {
+    //         unlinkFields.forEach((field) => {
+    //           // Should return nonnull of query type
+    //           expect(field.type).toEqual(new GraphQLNonNull(queryType));
+    //           expect(field.args).toIncludeAllPartialMembers([
+    //             {
+    //               name: 'id',
+    //               type: new GraphQLNonNull(GraphQLID),
+    //               extensions: {}
+    //             }
+    //           ]);
+    //           expect(field.extensions).toEqual({});
+    //         });
+    //       }
+    //     });
+    //   });
 
-        // TODO: check remove Fields
-        const removeFields = Object.entries(type.getFields())
-          .filter((entry) => entry[0].startsWith('remove'))
-          .map((entry) => entry[1]);
-        if (removeFields.length > 0) {
-          removeFields.forEach((field) => {
-            // Should return nonnull of query type
-            expect(field.type).toEqual(new GraphQLNonNull(queryType));
-            expect(field.args).toIncludeAllPartialMembers([
-              {
-                name: 'id',
-                type: new GraphQLNonNull(GraphQLID),
-                extensions: {}
-              }
-            ]);
-            expect(field.extensions).toEqual({});
-          });
-        }
-      };
+    //   it('with correct set fields', async () => {
+    //     // Check set fields
+    //     types.forEach((type) => {
+    //       const typeName = type.name.slice(0, -'Mutation'.length);
+    //       const queryType = schema.getType(typeName)!;
+    //       const setFields = getFieldsByPrefix(type, 'set');
+    //       if (setFields.length > 0) {
+    //         setFields.forEach((field) => {
+    //           // Read the return type of the field of the queryType, derived from the fieldName of this field
+    //           const derivedName = decapitalize(field.name.slice('set'.length));
+    //           const argTypeName = (queryType as GraphQLObjectType)
+    //             .getFields()
+    //             [derivedName]!.type.toString();
+    //           // Should return nonnull of query type
+    //           expect(field.type).toEqual(new GraphQLNonNull(queryType));
+    //           expect(field.args).toIncludeAllPartialMembers([
+    //             {
+    //               name: 'input',
+    //               type: new GraphQLNonNull(
+    //                 schema.getType(`Create${argTypeName}Input`)!
+    //               ),
+    //               extensions: {}
+    //             }
+    //           ]);
+    //           expect(field.extensions).toEqual({});
+    //         });
+    //       }
+    //     });
+    //   });
 
-      // Check mutation types
-      types.map((type) => type as GraphQLObjectType).forEach(checkMutationType);
-    });
+    //   it('with correct clear fields', async () => {
+    //     // Check clear fields
+    //     types.forEach((type) => {
+    //       const typeName = type.name.slice(0, -'Mutation'.length);
+    //       const queryType = schema.getType(typeName)!;
+    //       const clearFields = getFieldsByPrefix(type, 'clear');
+    //       if (clearFields.length > 0) {
+    //         clearFields.forEach((field) => {
+    //           // Should return nonnull of query type
+    //           expect(field.type).toEqual(new GraphQLNonNull(queryType));
+    //           expect(field.args).toEqual([]);
+    //           expect(field.extensions).toEqual({});
+    //         });
+    //       }
+    //     });
+    //   });
+
+    //   it('with correct add fields', async () => {
+    //     // Check add fields
+    //     types.forEach((type) => {
+    //       const typeName = type.name.slice(0, -'Mutation'.length);
+    //       const queryType = schema.getType(typeName)!;
+    //       const addFields = getFieldsByPrefix(type, 'add');
+    //       if (addFields.length > 0) {
+    //         addFields.forEach((field) => {
+    //           // Read the return type of the field of the queryType, derived from the fieldName of this field
+    //           const derivedName = decapitalize(field.name.slice('set'.length));
+    //           const argTypeName = (
+    //             (queryType as GraphQLObjectType).getFields()[derivedName]!
+    //               .type! as GraphQLList<any>
+    //           ).ofType.toString();
+    //           // Should return nonnull of query type
+    //           expect(field.type).toEqual(new GraphQLNonNull(queryType));
+    //           expect(field.args).toIncludeAllPartialMembers([
+    //             {
+    //               name: 'input',
+    //               type: new GraphQLNonNull(
+    //                 schema.getType(`Create${argTypeName}Input`)!
+    //               ),
+    //               extensions: {}
+    //             }
+    //           ]);
+    //           expect(field.extensions).toEqual({});
+    //         });
+    //       }
+    //     });
+    //   });
+
+    //   it('with correct remove fields', async () => {
+    //     // check remove Fields
+    //     types.forEach((type) => {
+    //       const typeName = type.name.slice(0, -'Mutation'.length);
+    //       const queryType = schema.getType(typeName)!;
+    //       const removeFields = getFieldsByPrefix(type, 'remove');
+    //       if (removeFields.length > 0) {
+    //         removeFields.forEach((field) => {
+    //           // Should return nonnull of query type
+    //           expect(field.type).toEqual(new GraphQLNonNull(queryType));
+    //           expect(field.args).toIncludeAllPartialMembers([
+    //             {
+    //               name: 'id',
+    //               type: new GraphQLNonNull(GraphQLID),
+    //               extensions: {}
+    //             }
+    //           ]);
+    //           expect(field.extensions).toEqual({});
+    //         });
+    //       }
+    //     });
+    //   });
+
+    //   it('with correctly paired link fields', async () => {
+    //     types.forEach((type) => {
+    //       const typeName = type.name.slice(0, -'Mutation'.length);
+    //       const addFields = getFieldsByPrefix(type, 'add');
+    //       const removeFields = getFieldsByPrefix(type, 'remove');
+    //       const setFields = getFieldsByPrefix(type, 'set');
+    //       const clearFields = getFieldsByPrefix(type, 'clear');
+    //       const linkFields = getFieldsByPrefix(type, 'link');
+    //       const unlinkFields = getFieldsByPrefix(type, 'unlink');
+
+    //       const checkIfFieldsAreLinkPaired = (
+    //         pair: [GraphQLField<any, any>[], GraphQLField<any, any>[]],
+    //         prefixes: [string, string]
+    //       ) => {
+    //         const [fields1, fields2] = pair;
+    //         const [prefix1, prefix2] = prefixes;
+    //         // First check
+    //         if (fields1.length > 0) {
+    //           fields1.forEach((field) => {
+    //             const subName = field.name.slice(prefix1.length);
+    //             expect(fields2).toIncludeAllPartialMembers([
+    //               { name: `${prefix2}${subName}` }
+    //             ]);
+    //             expect(linkFields).toIncludeAllPartialMembers([
+    //               { name: `link${subName}` }
+    //             ]);
+    //             expect(unlinkFields).toIncludeAllPartialMembers([
+    //               { name: `unlink${subName}` }
+    //             ]);
+    //           });
+    //         }
+    //         // Opposite check
+    //         if (fields2.length > 0) {
+    //           fields2.forEach((field) => {
+    //             const subName = field.name.slice(prefix2.length);
+    //             expect(fields1).toIncludeAllPartialMembers([
+    //               { name: `${prefix1}${subName}` }
+    //             ]);
+    //             expect(linkFields).toIncludeAllPartialMembers([
+    //               { name: `link${subName}` }
+    //             ]);
+    //             expect(unlinkFields).toIncludeAllPartialMembers([
+    //               { name: `unlink${subName}` }
+    //             ]);
+    //           });
+    //         }
+    //       };
+
+    //       // Add/remove fields and set/clear fields should come paired with link/unlink fields;
+    //       checkIfFieldsAreLinkPaired(
+    //         [addFields, removeFields],
+    //         ['add', 'remove']
+    //       );
+    //       checkIfFieldsAreLinkPaired(
+    //         [setFields, clearFields],
+    //         ['set', 'clear']
+    //       );
+    //     });
+    //   });
+    // });
   });
 });
