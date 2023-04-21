@@ -188,7 +188,9 @@ export class MutationHandler {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
+    // Grab id of the parent object
     const parentId = source.subject!;
+    // Grab the type of the return object
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
     ) as GraphQLObjectType;
