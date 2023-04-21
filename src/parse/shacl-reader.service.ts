@@ -105,11 +105,8 @@ export class ShaclReaderService {
 
   async parseSHACLs(uri: string): Promise<GraphQLSchema> {
     if (!this.primed) {
-      console.time('Prime schema cache');
       await this.primeCache(uri);
-      console.timeEnd('Prime schema cache');
     }
-    console.time('Parse SHACL to schema');
     const context = new Context(this._cache, this.generateObjectType);
 
     // Generate Schema
@@ -118,7 +115,6 @@ export class ShaclReaderService {
       mutation: this.generateMutationEntryPoints(context),
       directives: [IS_DIRECTIVE, PROPERTY_DIRECTIVE, IDENTIFIER_DIRECTIVE]
     });
-    console.timeEnd('Parse SHACL to schema');
     return schema;
   }
 

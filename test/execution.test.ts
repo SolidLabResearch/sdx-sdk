@@ -142,7 +142,6 @@ describe('A GQL Schema can execute', () => {
     );
     expect(result).not.toBeUndefined();
     expect(result.data).not.toBeUndefined();
-    console.log(result);
     expect(result.data).toHaveProperty('mutateContact');
     const contact = (result.data! as any).mutateContact;
     expect(contact.delete).toEqual({ ...input });
@@ -194,7 +193,6 @@ describe('A GQL Schema can execute', () => {
       }
     );
     expect(result).not.toBeUndefined();
-    console.log(result);
     expect(result.data).not.toBeUndefined();
     expect(result.data).toHaveProperty('mutateContact');
     const contact = (result.data! as any).mutateContact;

@@ -70,7 +70,6 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
       schema.getSubscriptionType()?.name
     ].filter((t) => !!t) as string[];
 
-    console.time('Execute query');
     const result = await graphql({
       source: query,
       variableValues: vars!,
@@ -78,7 +77,6 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
       contextValue: context,
       fieldResolver: this.fieldResolver
     });
-    console.timeEnd('Execute query');
     return result as ExecutionResult<R>;
   };
 

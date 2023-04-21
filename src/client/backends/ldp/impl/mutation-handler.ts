@@ -128,7 +128,6 @@ export class MutationHandler {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
-    console.log('DELETE MUTATION!!!!!!!');
     const targetUrl = await context.resolver.resolve(
       source.parentClassIri!,
       new TargetResolverContext(this.ldpClient)
