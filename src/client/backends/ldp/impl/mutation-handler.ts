@@ -21,6 +21,7 @@ import {
   getGraph,
   getSubGraph
 } from './utils';
+import { decapitalize, printQuads } from '../../../../commons/util';
 
 const { literal, namedNode, quad } = DataFactory;
 const ID_FIELD = 'id';
@@ -188,6 +189,7 @@ export class MutationHandler {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
+    const parentId = source.subject!;
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
     ) as GraphQLObjectType;
@@ -196,16 +198,34 @@ export class MutationHandler {
       new TargetResolverContext(this.ldpClient)
     );
     const input = (args as any).input;
-
-    // Generate triples for creation
-
-    // Generate triples for setting
-    const { inserts, deletes } = this.generateTriplesForUpdate(
-      source.quads!,
-      input,
-      source.subject!,
-      returnType
+    const inputId = namedNode(
+      this.getNewInstanceID(input, source.resourceType!)
     );
+    const inputType = info.parentType
+      .getFields()
+      [info.fieldName]!.args.find((arg) => arg.name === 'input')!.type;
+    const className = this.getDirectives(inputType).is['class'];
+
+    // Generate triples for creation (input quads)
+    const inserts = this.generateTriplesForInput(
+      inputId,
+      input,
+      utils.unwrapNonNull(inputType) as GraphQLInputObjectType,
+      namedNode(className)
+    );
+
+    const originalFieldName = decapitalize(info.fieldName.slice('set'.length));
+    const predicate = this.getDirectives(
+      returnType.getFields()[originalFieldName]!
+    ).property['iri'];
+    inserts.push(quad(parentId, namedNode(predicate), inputId));
+    const deletes = new Store(source.quads).getQuads(
+      parentId,
+      namedNode(predicate),
+      null,
+      null
+    );
+
     switch (source.resourceType!) {
       case ResourceType.DOCUMENT:
         // Update triples in doc using patch
@@ -243,9 +263,11 @@ export class MutationHandler {
       case ResourceType.CONTAINER:
         return '';
       case ResourceType.DOCUMENT:
-        return (
-          input[ID_FIELD]?.toString() ?? `#${input[SLUG_FIELD]}` ?? uuidv4()
-        );
+        return ID_FIELD in input
+          ? input[ID_FIELD].toString()
+          : SLUG_FIELD in input
+          ? input[SLUG_FIELD].toString()
+          : uuidv4();
       default:
         return '';
     }

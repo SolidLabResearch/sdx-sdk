@@ -56,3 +56,21 @@ export const flipNames = gql`
     }
   }
 `;
+
+export const setAddress = gql`
+  mutation setAddress($id: ID!, $input: CreateAddressInput!) {
+    mutateContact(id: $id) {
+      setAddress(input: $input) {
+        id
+        givenName
+        familyName
+        address {
+          streetLine
+          postalCode
+          city
+          country
+        }
+      }
+    }
+  }
+`;

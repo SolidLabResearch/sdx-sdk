@@ -6,7 +6,8 @@ import {
   deleteContact,
   flipNames,
   getContact,
-  getContacts
+  getContacts,
+  setAddress
 } from './assets/gql/my-queries';
 import { readFile } from 'fs/promises';
 import { Parser, Store, Writer } from 'n3';
@@ -36,8 +37,8 @@ mockedAxios.patch.mockImplementation(async (url, data) => {
   const store = new Store(quads);
   const { inserts, deletes } = parseInsertsDeletes(data as string);
 
-  console.log('inserts', inserts);
-  console.log('deletes', deletes);
+  // console.log('inserts', inserts);
+  // console.log('deletes', deletes);
 
   store.removeQuads(deletes);
   store.addQuads(inserts);
@@ -172,6 +173,41 @@ describe('A GQL Schema can execute', () => {
       id: input.id,
       givenName: input.familyName,
       familyName: input.givenName
+    });
+  });
+
+  it('a mutation (set single non-scalar)', async () => {
+    const obj = {
+      id: 'http://example.org/cont/tdupont',
+      streetLine: 'Heidestraat 92',
+      postalCode: '9050',
+      city: 'Gentbrugge',
+      country: 'Belgium'
+    };
+    const { id, ...input } = obj;
+    const result = await ldpBackend.requester.call(
+      ldpBackend.requester,
+      setAddress,
+      {
+        id,
+        input
+      }
+    );
+    expect(result).not.toBeUndefined();
+    console.log(result);
+    expect(result.data).not.toBeUndefined();
+    expect(result.data).toHaveProperty('mutateContact');
+    const contact = (result.data! as any).mutateContact;
+    expect(contact.setAddress).toEqual({
+      id,
+      givenName: 'Thomas',
+      familyName: 'Dupont',
+      address: {
+        streetLine: obj.streetLine,
+        postalCode: obj.postalCode,
+        city: obj.city,
+        country: obj.country
+      }
     });
   });
 });
