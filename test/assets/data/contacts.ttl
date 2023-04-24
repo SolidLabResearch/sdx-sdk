@@ -1,6 +1,6 @@
 <http://example.org/cont/wkerckho> a <http://schema.org/Person>;
     <http://schema.org/givenName> "Wannes";
-    <http://schema.org/familyName> "Kerckhove";
+    <http://schema.org/familyName> "Kerckhove".
 <http://example.org/cont/tdupont> a <http://schema.org/Person>;
     <http://schema.org/givenName> "Thomas";
     <http://schema.org/familyName> "Dupont";
