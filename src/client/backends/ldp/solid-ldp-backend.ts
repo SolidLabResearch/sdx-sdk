@@ -12,6 +12,7 @@ import { QueryHandler } from './impl/query-handler';
 import { IntermediateResult, ResourceType } from './impl/utils';
 import { StaticTargetResolver, TargetResolver } from './target-resolvers';
 import { perfLogger } from '../../../commons/logger';
+import { printQuads } from '../../../commons/util';
 
 const logger = perfLogger;
 
@@ -105,6 +106,7 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     }
     // Pure query, or mutation return type query (queryOverride)
     if ('query' === operation.operation || source.queryOverride) {
+      // printQuads(source.quads, 'override');
       return this.queryHandler.handleQuery(
         source,
         args,

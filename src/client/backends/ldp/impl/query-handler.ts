@@ -1,4 +1,5 @@
 import {
+  GraphQLObjectType,
   GraphQLOutputType,
   GraphQLResolveInfo,
   defaultFieldResolver,
@@ -6,7 +7,7 @@ import {
   isNonNullType,
   isScalarType
 } from 'graphql';
-import { DataFactory, Store } from 'n3';
+import { DataFactory, Quad, Store } from 'n3';
 import { LdpClient, vocab } from '../../../../commons';
 import { SolidLDPContext } from '../solid-ldp-backend';
 import { TargetResolverContext } from '../target-resolvers';
@@ -17,6 +18,7 @@ import {
   getSubGraph,
   getSubGraphArray
 } from './utils';
+import { printQuads } from '../../../../commons/util';
 
 const { namedNode } = DataFactory;
 
@@ -31,14 +33,14 @@ export class QueryHandler {
     rootTypes: string[]
   ): Promise<IntermediateResult | unknown> {
     const { returnType, fieldName, parentType } = info;
-    if (rootTypes.includes(parentType.name)) {
+    if (rootTypes.includes(parentType.name) && source.quads.length === 0) {
       const className = getDirectives(returnType).is['class'] as string;
       const targetUrl = await context.resolver.resolve(
         className,
         new TargetResolverContext(this.ldpClient)
       );
       source.quads = await getGraph(targetUrl.toString()).then((quads) =>
-        getSubGraph(quads, className, args as any)
+        getSubGraph(quads, className, null, args as any)
       );
     }
     // Array
@@ -72,7 +74,7 @@ export class QueryHandler {
       // Object
       else {
         const className = getDirectives(returnType).is['class'] as string;
-        return (await getSubGraphArray(source.quads!, className, {})).map(
+        return (await getSubGraphArray(source.quads!, className, null, {})).map(
           (quads) => ({ ...source, quads })
         );
       }
@@ -109,12 +111,49 @@ export class QueryHandler {
       }
       // Object type
       else {
+        console.log('YESYES', info.path);
+        console.log('YESYES', args);
+        const id = (args as any).id;
+        // return source;
+        // const parentId = this.getTypeIdentifier(info.parentType, source.quads);
+        // console.log('PARENTID', parentId);
+        // if (parentId) {
         const className = getDirectives(returnType).is['class'] as string;
-        source.quads = await getSubGraph(source.quads!, className, {});
+        const type = info.schema.getType(fieldName)!;
+        const predicate = type
+          ? (getDirectives(type).property['iri'] as string)
+          : null;
+        // TODO: Should only continue, if subgraph is reachable
+        source.quads = await getSubGraph(
+          source.quads!,
+          className,
+          predicate,
+          args || {}
+        );
+        printQuads(source.quads, `SubGraph with ${(args as any).id}`);
         source.parentClassIri = className;
         return source;
+        // }
+        // return null;
       }
     }
+  }
+
+  private getTypeIdentifier(
+    type: GraphQLObjectType<any, any>,
+    quads: Quad[]
+  ): string | undefined {
+    console.log('NONONO', type);
+    const idField = Object.values(type.getFields()).find(
+      (field) => (field.extensions.directives as any).identifier !== undefined
+    );
+    console.log('MAYBE');
+    console.log('idField', idField);
+    if (!idField) {
+      return undefined;
+    }
+    return quads.find((quad) => quad.predicate.value === idField.name)?.object
+      ?.value;
   }
 
   private getIdentifier(store: Store, type: GraphQLOutputType): string {

@@ -17,6 +17,7 @@ const { namedNode } = DataFactory;
 export async function getSubGraphArray(
   source: Quad[],
   className: string,
+  predicate: string | null,
   args: Record<string, any>
 ): Promise<Quad[][]> {
   const store = new Store(source);
@@ -24,7 +25,8 @@ export async function getSubGraphArray(
   const quadsOfQuads = store
     .getSubjects(vocab.RDFS.a, namedNode(className), null)
     .map(
-      async (sub) => await getSubGraph(source, className, { id: sub.value })
+      async (sub) =>
+        await getSubGraph(source, className, predicate, { id: sub.value })
     );
   return Promise.all(quadsOfQuads);
 }
@@ -33,6 +35,7 @@ export async function getSubGraphArray(
 export async function getSubGraph(
   source: Quad[],
   className: string,
+  predicate: string | null,
   args: Record<string, any>
 ): Promise<Quad[]> {
   const store = new Store(source);

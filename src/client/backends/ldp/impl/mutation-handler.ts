@@ -45,7 +45,7 @@ export class MutationHandler {
         new TargetResolverContext(this.ldpClient)
       );
       const graph = await getGraph(targetUrl.toString());
-      source.quads = await getSubGraph(graph, className, args as any);
+      source.quads = await getSubGraph(graph, className, null, args as any);
     }
     if (fieldName === 'delete')
       return this.handleDeleteMutation(source, args, context, info);
@@ -57,7 +57,8 @@ export class MutationHandler {
       return this.handleGetMutateObjectType(source, args, context, info);
     if (fieldName.startsWith('set'))
       return this.handleSetMutation(source, args, context, info);
-    if (fieldName.startsWith('clear')) return this.TODO();
+    if (fieldName.startsWith('clear'))
+      return this.handleClearMutation(source, args, context, info);
     if (fieldName.startsWith('add')) return this.TODO();
     if (fieldName.startsWith('remove')) return this.TODO();
     if (fieldName.startsWith('link')) return this.TODO();
@@ -113,7 +114,12 @@ export class MutationHandler {
 
     if (targetUrl.toString()) {
       source.subject = namedNode((args as any).id);
-      source.quads = await getSubGraph(source.quads!, className, args as any);
+      source.quads = await getSubGraph(
+        source.quads!,
+        className,
+        null,
+        args as any
+      );
       source.parentClassIri = className;
       return source;
     } else {
@@ -240,6 +246,52 @@ export class MutationHandler {
     const store = new Store(source.quads);
     store.removeQuads(deletes);
     store.addQuads(inserts);
+    source.quads = store.getQuads(null, null, null, null);
+    return this.executeWithQueryHandler(source);
+  }
+
+  private async handleClearMutation<TArgs>(
+    source: IntermediateResult,
+    args: TArgs,
+    context: SolidLDPContext,
+    info: GraphQLResolveInfo
+  ): Promise<IntermediateResult> {
+    // Grab id of the parent object
+    const parentId = source.subject!;
+    // Grab the type of the return object
+    const returnType = info.schema.getType(
+      utils.unwrapNonNull(info.returnType).toString()
+    ) as GraphQLObjectType;
+    const targetUrl = await context.resolver.resolve(
+      source.parentClassIri!,
+      new TargetResolverContext(this.ldpClient)
+    );
+
+    // What is the type of the parentField that we have to clear.
+    const fieldName = decapitalize(info.fieldName.slice('clear'.length));
+    const predicate = this.getDirectives(returnType.getFields()[fieldName]!)
+      .property['iri'];
+    const deletes = new Store(source.quads).getQuads(
+      parentId,
+      namedNode(predicate),
+      null,
+      null
+    );
+
+    switch (source.resourceType!) {
+      case ResourceType.DOCUMENT:
+        // Update triples in doc using patch
+        await new LdpClient().patchDocument(
+          targetUrl.toString(),
+          null,
+          deletes
+        );
+    }
+
+    printQuads(deletes);
+    // Reconstruct object
+    const store = new Store(source.quads);
+    store.removeQuads(deletes);
     source.quads = store.getQuads(null, null, null, null);
     return this.executeWithQueryHandler(source);
   }

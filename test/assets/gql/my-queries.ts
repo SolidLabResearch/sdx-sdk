@@ -74,3 +74,21 @@ export const setAddress = gql`
     }
   }
 `;
+
+export const clearAddress = gql`
+  mutation clearAddress($id: ID!) {
+    mutateContact(id: $id) {
+      clearAddress {
+        id
+        givenName
+        familyName
+        address {
+          streetLine
+          postalCode
+          city
+          country
+        }
+      }
+    }
+  }
+`;
