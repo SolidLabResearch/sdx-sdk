@@ -9,16 +9,24 @@ import {
 } from 'graphql';
 import { DataFactory, Quad, Store } from 'n3';
 import { LdpClient, vocab } from '../../../../commons';
+import { printQuads } from '../../../../commons/util';
 import { SolidLDPContext } from '../solid-ldp-backend';
 import { TargetResolverContext } from '../target-resolvers';
 import {
   IntermediateResult,
+  ResourceType,
+  convertScalarValue,
+  getClassURI,
+  getCurrentDirective,
   getDirectives,
   getGraph,
+  getInstanceById,
+  getPropertyIRI,
+  getRawType,
   getSubGraph,
   getSubGraphArray
 } from './utils';
-import { printQuads } from '../../../../commons/util';
+import { RDFS } from '../../../../commons/vocab';
 
 const { namedNode } = DataFactory;
 
@@ -180,5 +188,95 @@ export class QueryHandler {
     return store
       .getObjects(namedNode(subject), namedNode(predicate), null)
       .map((obj) => obj.value);
+  }
+
+  /*** NEW ***/
+
+  async handleIdProperty<TArgs>(
+    source: IntermediateResult,
+    args: TArgs,
+    context: SolidLDPContext,
+    info: GraphQLResolveInfo
+  ): Promise<string> {
+    const subject = source.subject?.value ?? '';
+    const result =
+      subject.length === 0 || subject.startsWith('#')
+        ? source.requestURL!.concat(subject)
+        : subject;
+    console.log(result);
+    return result;
+  }
+
+  async handleScalarProperty<TArgs>(
+    source: IntermediateResult,
+    args: TArgs,
+    context: SolidLDPContext,
+    info: GraphQLResolveInfo
+  ): Promise<string> {
+    console.log('handleScalarProperty');
+    const iri = namedNode(getCurrentDirective(info).property!.iri);
+    const type = info.parentType.getFields()[info.fieldName]!.type;
+    const rawType = getRawType(type);
+    const result = source
+      .documentGraph!.find(source.subject!, iri, null)
+      .map((quad) => convertScalarValue(rawType, quad.object.value));
+    return isListType(type) || (isNonNullType(type) && isListType(type.ofType))
+      ? result
+      : result[0];
+  }
+
+  async handleRelationProperty<TArgs>(
+    source: IntermediateResult,
+    args: TArgs,
+    context: SolidLDPContext,
+    info: GraphQLResolveInfo
+  ): Promise<IntermediateResult | string> {
+    console.log('handleRelationProperty');
+    return 'relation';
+  }
+
+  async handleQueryEntrypoint<TArgs>(
+    source: IntermediateResult,
+    args: TArgs,
+    context: SolidLDPContext,
+    info: GraphQLResolveInfo
+  ): Promise<IntermediateResult | IntermediateResult[] | undefined> {
+    // FIXME: temporary set resourcetype
+    source.resourceType = ResourceType.DOCUMENT;
+
+    console.log('handleQueryEntrypoint');
+    const classUri = getClassURI(info.returnType);
+    console.log('returnType', info.returnType.toString());
+    console.log('classUri', classUri);
+    const targetUrl = await context.resolver.resolve(
+      classUri.value,
+      new TargetResolverContext(this.ldpClient)
+    );
+    if (targetUrl != null) {
+      const id = (args as any).id;
+      if (id !== null) {
+        return getInstanceById(
+          this.ldpClient,
+          targetUrl,
+          id,
+          classUri,
+          source.resourceType
+        );
+      } else {
+        // Collection entrypoint
+        console.log('collection entrypoint');
+        const graph = await this.ldpClient.downloadDocumentGraph(targetUrl);
+        console.log('graph', graph.getQuads());
+        return graph.find(null, RDFS.a, classUri).map((quad) => ({
+          graph,
+          quads: graph.getQuads(),
+          resourceType: source.resourceType,
+          requestURL: source.requestURL,
+          subject: quad.subject
+        }));
+      }
+    } else {
+      throw new Error('A target URL for this request could not be resolved!');
+    }
   }
 }

@@ -1,4 +1,10 @@
-import { GraphQLResolveInfo, graphql, print } from 'graphql';
+import {
+  GraphQLObjectType,
+  GraphQLResolveInfo,
+  graphql,
+  isScalarType,
+  print
+} from 'graphql';
 import { ExecutionResult } from 'graphql/execution/execute';
 import { DocumentNode } from 'graphql/language/ast';
 import { LdpClient, SolidClientCredentials } from '../../../commons';
@@ -9,7 +15,12 @@ import {
 import { ShaclReaderService } from '../../../parse';
 import { MutationHandler } from './impl/mutation-handler';
 import { QueryHandler } from './impl/query-handler';
-import { IntermediateResult, ResourceType } from './impl/utils';
+import {
+  IntermediateResult,
+  ResourceType,
+  getCurrentDirective,
+  getRawType
+} from './impl/utils';
 import { StaticTargetResolver, TargetResolver } from './target-resolvers';
 import { perfLogger } from '../../../commons/logger';
 import { printQuads } from '../../../commons/util';
@@ -87,35 +98,108 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<unknown> => {
-    const { operation } = info;
-    // setup intermediate result
-    source = source ?? {
-      quads: [],
-      resourceType: ResourceType.DOCUMENT
-    };
-
-    // Pure mutation
-    if ('mutation' === operation.operation && !source.queryOverride) {
-      return this.mutationHandler.handleMutation(
-        source,
-        args,
-        context,
-        info,
-        this.rootTypes
-      );
+    // FIXME: If source is empty, set default
+    if (!source) {
+      source = {
+        quads: [],
+        resourceType: ResourceType.DOCUMENT
+      };
     }
-    // Pure query, or mutation return type query (queryOverride)
-    if ('query' === operation.operation || source.queryOverride) {
-      // printQuads(source.quads, 'override');
-      return this.queryHandler.handleQuery(
-        source,
-        args,
-        context,
-        info,
-        this.rootTypes
+
+    // IF Directive @identifier is present
+    const directive = getCurrentDirective(info);
+    console.log(info.path, directive);
+    if ('identifier' in directive) {
+      console.log('IDENTFIIER');
+      return this.queryHandler.handleIdProperty(source, args, context, info);
+    } else if ('property' in directive) {
+      const rawType = getRawType(
+        info.parentType.getFields()[info.fieldName]!.type
       );
+      console.log('PROPERTY', info.fieldName, rawType);
+      if (isScalarType(rawType)) {
+        // IF Scalar
+        return this.queryHandler.handleScalarProperty(
+          source,
+          args,
+          context,
+          info
+        );
+      } else {
+        // else Relation
+        return this.queryHandler.handleRelationProperty(
+          source,
+          args,
+          context,
+          info
+        );
+      }
+    } else {
+      console.log('ELSE');
+      // IF MUTATION
+      if ('mutation' === info.operation.operation && !source.queryOverride) {
+        return this.mutationHandler.handleMutation(
+          source,
+          args,
+          context,
+          info,
+          this.rootTypes
+        );
+      } else {
+        // printQuads(source.quads, 'override');
+        return this.queryHandler.handleQueryEntrypoint(
+          source,
+          args,
+          context,
+          info
+        );
+      }
     }
   };
+
+  // handleIdProperty();
+
+  // ELSE IF Directive @property is present
+  // IF Scalar
+  // handleScalarProperty();
+  // ELSE Relelation
+  // handlerRelationProperty();
+
+  // ELSE
+  // IF MUTATION
+  // handleMutationEntryPoint();
+  // ELSE
+  // handleQueryEntryPoint();
+
+  //   const { operation } = info;
+  //   // setup intermediate result
+  //   source = source ?? {
+  //     quads: [],
+  //     resourceType: ResourceType.DOCUMENT
+  //   };
+
+  //   // Pure mutation
+  //   if ('mutation' === operation.operation && !source.queryOverride) {
+  //     return this.mutationHandler.handleMutation(
+  //       source,
+  //       args,
+  //       context,
+  //       info,
+  //       this.rootTypes
+  //     );
+  //   }
+  //   // Pure query, or mutation return type query (queryOverride)
+  //   if ('query' === operation.operation || source.queryOverride) {
+  //     // printQuads(source.quads, 'override');
+  //     return this.queryHandler.handleQuery(
+  //       source,
+  //       args,
+  //       context,
+  //       info,
+  //       this.rootTypes
+  //     );
+  //   }
+  // };
 }
 
 export interface SolidTargetBackend<

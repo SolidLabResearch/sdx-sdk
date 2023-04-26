@@ -9,7 +9,7 @@ import {
   isNonNullType,
   isScalarType
 } from 'graphql';
-import { DataFactory, NamedNode, Quad, Store } from 'n3';
+import { BlankNode, DataFactory, NamedNode, Quad, Store, Variable } from 'n3';
 import { v4 as uuidv4 } from 'uuid';
 import { LdpClient, utils, vocab } from '../../../../commons';
 import { SolidLDPContext } from '../solid-ldp-backend';
@@ -353,7 +353,7 @@ export class MutationHandler {
   private generateTriplesForUpdate(
     source: Quad[],
     input: Record<string, any>,
-    subject: NamedNode,
+    subject: NamedNode | BlankNode | Variable,
     objectTypeDefinition: GraphQLObjectType
   ): { inserts: Quad[]; deletes: Quad[] } {
     const store = new Store(source);

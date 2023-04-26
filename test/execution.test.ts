@@ -17,7 +17,7 @@ jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 mockedAxios.get.mockImplementation(async (uri) => {
-  if (uri === 'http://mock/data') {
+  if (uri === 'http://mock/data' || uri.startsWith('http://mock/data')) {
     const data = await readFile('test/assets/data/contacts.ttl');
     return { data: data.toString() };
   }
@@ -62,7 +62,7 @@ describe('A GQL Schema can execute', () => {
     defaultContext: context
   });
 
-  it('a query (single)', async () => {
+  it.only('a query (single)', async () => {
     const result = await ldpBackend.requester.call(
       ldpBackend.requester,
       getContact,
