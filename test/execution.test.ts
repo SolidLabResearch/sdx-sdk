@@ -46,7 +46,6 @@ mockedAxios.get.mockImplementation(async (uri) => {
 });
 
 mockedAxios.patch.mockImplementation(async (url, data) => {
-  console.log('MOCK CALLED');
   const contacts_data = await pickDataFile();
   const quads = new Parser({ format: 'text/turtle' }).parse(
     contacts_data.toString()

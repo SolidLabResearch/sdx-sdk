@@ -1,13 +1,8 @@
-import {
-  GraphQLObjectType,
-  GraphQLResolveInfo,
-  graphql,
-  isScalarType,
-  print
-} from 'graphql';
+import { GraphQLResolveInfo, graphql, isScalarType, print } from 'graphql';
 import { ExecutionResult } from 'graphql/execution/execute';
 import { DocumentNode } from 'graphql/language/ast';
 import { LdpClient, SolidClientCredentials } from '../../../commons';
+import { perfLogger } from '../../../commons/logger';
 import {
   URI_SDX_GENERATE_GRAPHQL_SCHEMA,
   URI_SDX_GENERATE_SHACL_FOLDER
@@ -27,8 +22,6 @@ import {
   TargetResolver,
   TargetResolverContext
 } from './target-resolvers';
-import { perfLogger } from '../../../commons/logger';
-import { printQuads } from '../../../commons/util';
 
 const logger = perfLogger;
 
@@ -57,7 +50,7 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
   private defaultContext?: SolidLDPContext;
   private queryHandler: QueryHandler;
   private mutationHandler: MutationHandler;
-  private rootTypes: string[] = [];
+  // private rootTypes: string[] = [];
   private parser: ShaclReaderService;
   private ldpClient: LdpClient;
   private targetResolverContext: TargetResolverContext;
@@ -83,13 +76,6 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     context = context ?? this.defaultContext;
     const query = print(doc);
     const schema = await this.parser.parseSHACLs(URI_SDX_GENERATE_SHACL_FOLDER);
-
-    this.rootTypes = [
-      schema.getQueryType()?.name,
-      schema.getMutationType()?.name,
-      schema.getSubscriptionType()?.name
-    ].filter((t) => !!t) as string[];
-
     const result = await graphql({
       source: query,
       variableValues: vars!,
@@ -116,7 +102,6 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     // IF Directive @identifier is present
     const directive = getCurrentDirective(info);
     if ('identifier' in directive) {
-      console.log('IDENTIFIER');
       const parentClassUri = getDirectives(info.parentType).is.class;
       const targetUrl = await context.resolver.resolve(
         parentClassUri,
@@ -125,20 +110,21 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
       source.requestURL = targetUrl.toString();
       return this.queryHandler.handleIdProperty(source, args, context, info);
     } else if ('property' in directive) {
+      // IF Directive @property is present
       const rawType = getRawType(
         info.parentType.getFields()[info.fieldName]!.type
       );
-      console.log('PROPERTY', info.fieldName, rawType);
+      // IF Scalar
       if (isScalarType(rawType)) {
-        // IF Scalar
         return this.queryHandler.handleScalarProperty(
           source,
           args,
           context,
           info
         );
-      } else {
-        // else Relation
+      }
+      // else Relation
+      else {
         return this.queryHandler.handleRelationProperty(
           source,
           args,
@@ -147,7 +133,6 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
         );
       }
     } else {
-      console.log('ELSE');
       // IF MUTATION
       if ('mutation' === info.operation.operation && !source.mutationHandled) {
         return this.mutationHandler.handleMutationEntrypoint(
@@ -156,8 +141,9 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
           context,
           info
         );
-      } else {
-        // printQuads(source.quads, 'override');
+      }
+      // Else QUERY
+      else {
         return this.queryHandler.handleQueryEntrypoint(
           source,
           args,
@@ -167,50 +153,6 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
       }
     }
   };
-
-  // handleIdProperty();
-
-  // ELSE IF Directive @property is present
-  // IF Scalar
-  // handleScalarProperty();
-  // ELSE Relelation
-  // handlerRelationProperty();
-
-  // ELSE
-  // IF MUTATION
-  // handleMutationEntryPoint();
-  // ELSE
-  // handleQueryEntryPoint();
-
-  //   const { operation } = info;
-  //   // setup intermediate result
-  //   source = source ?? {
-  //     quads: [],
-  //     resourceType: ResourceType.DOCUMENT
-  //   };
-
-  //   // Pure mutation
-  //   if ('mutation' === operation.operation && !source.queryOverride) {
-  //     return this.mutationHandler.handleMutation(
-  //       source,
-  //       args,
-  //       context,
-  //       info,
-  //       this.rootTypes
-  //     );
-  //   }
-  //   // Pure query, or mutation return type query (queryOverride)
-  //   if ('query' === operation.operation || source.queryOverride) {
-  //     // printQuads(source.quads, 'override');
-  //     return this.queryHandler.handleQuery(
-  //       source,
-  //       args,
-  //       context,
-  //       info,
-  //       this.rootTypes
-  //     );
-  //   }
-  // };
 }
 
 export interface SolidTargetBackend<

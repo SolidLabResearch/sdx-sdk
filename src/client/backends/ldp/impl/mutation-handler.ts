@@ -19,11 +19,8 @@ import {
   IntermediateResult,
   ResourceType,
   getDirectives,
-  getGraph,
-  getInstanceById,
-  getSubGraph
+  getInstanceById
 } from './utils';
-import { C } from '../../../../../dist/context-e8613b6b';
 
 const { literal, namedNode, quad } = DataFactory;
 const ID_FIELD = 'id';
@@ -32,50 +29,13 @@ const SLUG_FIELD = 'slug';
 export class MutationHandler {
   constructor(private ldpClient: LdpClient) {}
 
-  // async handleMutation<TArgs>(
-  //   source: IntermediateResult,
-  //   args: TArgs,
-  //   context: SolidLDPContext,
-  //   info: GraphQLResolveInfo,
-  //   rootTypes: string[]
-  // ): Promise<unknown> {
-  //   const { returnType, fieldName, parentType } = info;
-  //   if (rootTypes.includes(parentType.name)) {
-  //     const className = this.getDirectives(returnType).is['class'] as string;
-  //     const targetUrl = await context.resolver.resolve(
-  //       className,
-  //       new TargetResolverContext(this.ldpClient)
-  //     );
-  //     const graph = await getGraph(targetUrl.toString());
-  //     source.quads = await getSubGraph(graph, className, null, args as any);
-  //   }
-  //   if (fieldName === 'delete')
-  //     return this.handleDeleteMutation(source, args, context, info);
-  //   if (fieldName === 'update')
-  //     return this.handleUpdateMutation(source, args, context, info);
-  //   if (fieldName.startsWith('create'))
-  //     return this.handleCreateMutation(source, args, context, info);
-  //   if (fieldName.startsWith('mutate'))
-  //     return this.handleGetMutateObjectType(source, args, context, info);
-  //   if (fieldName.startsWith('set'))
-  //     return this.handleSetMutation(source, args, context, info);
-  //   if (fieldName.startsWith('clear'))
-  //     return this.handleClearMutation(source, args, context, info);
-  //   if (fieldName.startsWith('add')) return this.TODO();
-  //   if (fieldName.startsWith('remove')) return this.TODO();
-  //   if (fieldName.startsWith('link')) return this.TODO();
-  //   if (fieldName.startsWith('unlink')) return this.TODO();
-  //   // Mutation handler can't solve it, maybe the query handler can?
-  //   return this.mutationHandled(source);
-  // }
-
   async handleMutationEntrypoint<TArgs>(
     source: IntermediateResult,
     args: TArgs,
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult | void> {
-    const { returnType, fieldName, parentType } = info;
+    const { fieldName } = info;
     if (fieldName === 'delete')
       return this.handleDeleteMutation(source, args, context, info);
     if (fieldName === 'update')
@@ -143,14 +103,13 @@ export class MutationHandler {
     );
 
     if (targetUrl.toString()) {
-      const instance = await getInstanceById(
+      return getInstanceById(
         this.ldpClient,
         targetUrl,
         (args as any).id,
         className,
         source.resourceType
       );
-      return instance;
     } else {
       throw new Error('A target URL for this request could not be resolved!');
     }

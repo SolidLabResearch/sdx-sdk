@@ -25,7 +25,6 @@ import {
 } from 'n3';
 import { Graph, LdpClient, vocab } from '../../../../commons';
 import { RDFS } from '../../../../commons/vocab';
-import { deprecate } from 'util';
 
 const { namedNode } = DataFactory;
 
