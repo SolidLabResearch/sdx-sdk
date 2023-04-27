@@ -6,3 +6,4 @@ export { vocab };
 
 export * from './auth/solid-client-credentials';
 export * from './ldp/ldp-client';
+export * from './graph';

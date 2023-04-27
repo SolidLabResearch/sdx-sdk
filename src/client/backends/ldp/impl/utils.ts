@@ -1,15 +1,30 @@
-import { Quad, Store, DataFactory, Parser } from 'n3';
-import type { NamedNode } from 'n3';
-import { vocab } from '../../../../commons';
 import axios from 'axios';
 import {
+  GraphQLBoolean,
   GraphQLField,
+  GraphQLFloat,
   GraphQLInputField,
+  GraphQLInt,
+  GraphQLNamedType,
+  GraphQLObjectType,
+  GraphQLResolveInfo,
+  GraphQLString,
   GraphQLType,
   isListType,
   isNonNullType,
   isScalarType
 } from 'graphql';
+import {
+  BlankNode,
+  DataFactory,
+  NamedNode,
+  Parser,
+  Quad,
+  Store,
+  Variable
+} from 'n3';
+import { Graph, LdpClient, vocab } from '../../../../commons';
+import { RDFS } from '../../../../commons/vocab';
 
 const { namedNode } = DataFactory;
 
@@ -17,6 +32,7 @@ const { namedNode } = DataFactory;
 export async function getSubGraphArray(
   source: Quad[],
   className: string,
+  predicate: string | null,
   args: Record<string, any>
 ): Promise<Quad[][]> {
   const store = new Store(source);
@@ -24,7 +40,8 @@ export async function getSubGraphArray(
   const quadsOfQuads = store
     .getSubjects(vocab.RDFS.a, namedNode(className), null)
     .map(
-      async (sub) => await getSubGraph(source, className, { id: sub.value })
+      async (sub) =>
+        await getSubGraph(source, className, predicate, { id: sub.value })
     );
   return Promise.all(quadsOfQuads);
 }
@@ -33,6 +50,7 @@ export async function getSubGraphArray(
 export async function getSubGraph(
   source: Quad[],
   className: string,
+  predicate: string | null,
   args: Record<string, any>
 ): Promise<Quad[]> {
   const store = new Store(source);
@@ -80,15 +98,117 @@ export function getDirectives(
   return isScalarType(type) ? {} : type.extensions.directives ?? {};
 }
 
+export function getRawType(type: GraphQLType): GraphQLNamedType {
+  if (isListType(type)) {
+    return getRawType(type.ofType);
+  }
+  if (isNonNullType(type)) {
+    return getRawType(type.ofType);
+  }
+  return type;
+}
+
 export enum ResourceType {
   CONTAINER,
   DOCUMENT
 }
 
 export interface IntermediateResult {
-  quads: Quad[];
+  requestURL?: string;
+  documentGraph?: Graph;
+  /**
+   * @deprecated Use `documentGraph` instead
+   */
+  quads?: Quad[];
+  /**
+   * @deprecated
+   */
   parentClassIri?: string;
   resourceType: ResourceType;
-  subject?: NamedNode;
-  queryOverride?: boolean;
+  /** The subject node that we descended into */
+  subject?: NamedNode | BlankNode | Variable;
+  mutationHandled?: boolean;
+}
+
+export function getClassURI(type: GraphQLType): NamedNode {
+  return namedNode(getDirectives(type).is?.class ?? '');
+}
+
+export function getPropertyIRI(type: GraphQLType): NamedNode {
+  return namedNode(getDirectives(type).property?.iri ?? '');
+}
+
+export function getCurrentDirective(
+  info: GraphQLResolveInfo
+): Record<string, Record<string, any>> {
+  const { schema, path } = info;
+  const { key, typename } = path;
+
+  if (typename) {
+    const type = key
+      ? (schema.getType(typename) as GraphQLObjectType).getFields()[key]!
+      : schema.getType(typename);
+    return (
+      (type?.extensions?.directives as Record<string, Record<string, any>>) ??
+      {}
+    );
+  }
+  return {};
+}
+
+export async function getInstanceById(
+  ldpCLient: LdpClient,
+  targetUrl: URL,
+  id: string,
+  classUri: NamedNode,
+  resourceType: ResourceType
+): Promise<IntermediateResult | undefined> {
+  const documentUrl =
+    resourceType === ResourceType.DOCUMENT
+      ? targetUrl
+      : getAbsoluteURL(id, targetUrl);
+  if (!documentUrl.toString().startsWith(targetUrl.toString())) {
+    throw new Error(
+      `Entity with id ${documentUrl} is not in range of target URL ${targetUrl}`
+    );
+  }
+  const documentGraph = await ldpCLient.downloadDocumentGraph(documentUrl);
+  return documentGraph.find(namedNode(id), RDFS.a, classUri).map(
+    (quad) =>
+      ({
+        resourceType,
+        documentGraph,
+        requestURL: targetUrl.toString(),
+        subject: quad.subject!
+        // mutationHandled: true
+      } as IntermediateResult)
+  )[0];
+}
+
+export function convertScalarValue(type: GraphQLType, literal: string): any {
+  if (!isScalarType(type)) {
+    throw new Error(`Type ${type} is not a scalar type`);
+  }
+  switch (type) {
+    case GraphQLBoolean:
+      return new Boolean(literal).valueOf();
+    case GraphQLFloat:
+      return parseFloat(literal).valueOf();
+    case GraphQLInt:
+      return parseInt(literal).valueOf();
+    default:
+    case GraphQLString:
+      return literal;
+  }
+}
+
+function getAbsoluteURL(urlOrRelativePath: string, baseUrl: URL): URL {
+  try {
+    return new URL(urlOrRelativePath);
+  } catch {
+    const result = urlOrRelativePath.startsWith('/')
+      ? urlOrRelativePath.slice(1)
+      : urlOrRelativePath;
+    return new URL(`${baseUrl.toString()}/${result}`);
+  }
 }

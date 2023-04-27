@@ -1,6 +1,7 @@
 import axios, { AxiosResponse } from 'axios';
-import { Quad, Writer } from 'n3';
+import { Parser, Quad, Writer } from 'n3';
 import { SolidClientCredentials } from '../auth/solid-client-credentials';
+import { Graph } from '../graph';
 
 export class LdpClient {
   private clientCredentials?: SolidClientCredentials;
@@ -54,5 +55,10 @@ export class LdpClient {
       );
     }
     return resp;
+  }
+
+  async downloadDocumentGraph(location: URL): Promise<Graph> {
+    const doc = await axios.get(location.toString());
+    return new Graph(new Parser().parse(doc.data));
   }
 }

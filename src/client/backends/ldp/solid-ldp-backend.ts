@@ -1,7 +1,8 @@
-import { GraphQLResolveInfo, graphql, print } from 'graphql';
+import { GraphQLResolveInfo, graphql, isScalarType, print } from 'graphql';
 import { ExecutionResult } from 'graphql/execution/execute';
 import { DocumentNode } from 'graphql/language/ast';
 import { LdpClient, SolidClientCredentials } from '../../../commons';
+import { perfLogger } from '../../../commons/logger';
 import {
   URI_SDX_GENERATE_GRAPHQL_SCHEMA,
   URI_SDX_GENERATE_SHACL_FOLDER
@@ -9,9 +10,18 @@ import {
 import { ShaclReaderService } from '../../../parse';
 import { MutationHandler } from './impl/mutation-handler';
 import { QueryHandler } from './impl/query-handler';
-import { IntermediateResult, ResourceType } from './impl/utils';
-import { StaticTargetResolver, TargetResolver } from './target-resolvers';
-import { perfLogger } from '../../../commons/logger';
+import {
+  IntermediateResult,
+  ResourceType,
+  getCurrentDirective,
+  getDirectives,
+  getRawType
+} from './impl/utils';
+import {
+  StaticTargetResolver,
+  TargetResolver,
+  TargetResolverContext
+} from './target-resolvers';
 
 const logger = perfLogger;
 
@@ -40,17 +50,20 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
   private defaultContext?: SolidLDPContext;
   private queryHandler: QueryHandler;
   private mutationHandler: MutationHandler;
-  private rootTypes: string[] = [];
+  // private rootTypes: string[] = [];
   private parser: ShaclReaderService;
+  private ldpClient: LdpClient;
+  private targetResolverContext: TargetResolverContext;
 
   constructor(options?: SolidLDPBackendOptions) {
     // TODO: Use schema to parse, instead of SHACL files
     // Default to generated schema location
     this.schemaFile = options?.schemaFile || URI_SDX_GENERATE_GRAPHQL_SCHEMA;
     this.defaultContext = options?.defaultContext;
-    const ldpClient = new LdpClient(options?.clientCredentials);
-    this.queryHandler = new QueryHandler(ldpClient);
-    this.mutationHandler = new MutationHandler(ldpClient);
+    this.ldpClient = new LdpClient(options?.clientCredentials);
+    this.targetResolverContext = new TargetResolverContext(this.ldpClient);
+    this.queryHandler = new QueryHandler(this.ldpClient);
+    this.mutationHandler = new MutationHandler(this.ldpClient);
     this.parser = new ShaclReaderService();
   }
 
@@ -63,13 +76,6 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     context = context ?? this.defaultContext;
     const query = print(doc);
     const schema = await this.parser.parseSHACLs(URI_SDX_GENERATE_SHACL_FOLDER);
-
-    this.rootTypes = [
-      schema.getQueryType()?.name,
-      schema.getMutationType()?.name,
-      schema.getSubscriptionType()?.name
-    ].filter((t) => !!t) as string[];
-
     const result = await graphql({
       source: query,
       variableValues: vars!,
@@ -86,32 +92,65 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<unknown> => {
-    const { operation } = info;
-    // setup intermediate result
-    source = source ?? {
-      quads: [],
-      resourceType: ResourceType.DOCUMENT
-    };
-
-    // Pure mutation
-    if ('mutation' === operation.operation && !source.queryOverride) {
-      return this.mutationHandler.handleMutation(
-        source,
-        args,
-        context,
-        info,
-        this.rootTypes
-      );
+    // FIXME: If source is empty, set default
+    if (!source) {
+      source = {
+        resourceType: ResourceType.DOCUMENT
+      };
     }
-    // Pure query, or mutation return type query (queryOverride)
-    if ('query' === operation.operation || source.queryOverride) {
-      return this.queryHandler.handleQuery(
-        source,
-        args,
-        context,
-        info,
-        this.rootTypes
+
+    // IF Directive @identifier is present
+    const directive = getCurrentDirective(info);
+    if ('identifier' in directive) {
+      const parentClassUri = getDirectives(info.parentType).is.class;
+      const targetUrl = await context.resolver.resolve(
+        parentClassUri,
+        this.targetResolverContext
       );
+      source.requestURL = targetUrl.toString();
+      return this.queryHandler.handleIdProperty(source, args, context, info);
+    } else if ('property' in directive) {
+      // IF Directive @property is present
+      const rawType = getRawType(
+        info.parentType.getFields()[info.fieldName]!.type
+      );
+      // IF Scalar
+      if (isScalarType(rawType)) {
+        return this.queryHandler.handleScalarProperty(
+          source,
+          args,
+          context,
+          info
+        );
+      }
+      // else Relation
+      else {
+        return this.queryHandler.handleRelationProperty(
+          source,
+          args,
+          context,
+          info
+        );
+      }
+    } else {
+      // IF MUTATION
+      if ('mutation' === info.operation.operation && !source.mutationHandled) {
+        return this.mutationHandler.handleMutationEntrypoint(
+          source,
+          args,
+          context,
+          info
+        );
+      }
+      // Else QUERY
+      else {
+        return this.queryHandler.handleQueryEntrypoint(
+          source,
+          args,
+          context,
+          info
+        );
+      }
     }
   };
 }
