@@ -25,6 +25,7 @@ import {
 } from 'n3';
 import { Graph, LdpClient, vocab } from '../../../../commons';
 import { RDFS } from '../../../../commons/vocab';
+import { deprecate } from 'util';
 
 const { namedNode } = DataFactory;
 
@@ -116,12 +117,18 @@ export enum ResourceType {
 export interface IntermediateResult {
   requestURL?: string;
   documentGraph?: Graph;
-  quads: Quad[];
+  /**
+   * @deprecated Use `documentGraph` instead
+   */
+  quads?: Quad[];
+  /**
+   * @deprecated
+   */
   parentClassIri?: string;
   resourceType: ResourceType;
   /** The subject node that we descended into */
   subject?: NamedNode | BlankNode | Variable;
-  queryOverride?: boolean;
+  mutationHandled?: boolean;
 }
 
 export function getClassURI(type: GraphQLType): NamedNode {
@@ -142,7 +149,10 @@ export function getCurrentDirective(
     const type = key
       ? (schema.getType(typename) as GraphQLObjectType).getFields()[key]!
       : schema.getType(typename);
-    return (type?.extensions?.directives as Record<string, any>) ?? {};
+    return (
+      (type?.extensions?.directives as Record<string, Record<string, any>>) ??
+      {}
+    );
   }
   return {};
 }
@@ -167,12 +177,11 @@ export async function getInstanceById(
   return documentGraph.find(namedNode(id), RDFS.a, classUri).map(
     (quad) =>
       ({
-        targetUrl,
-        quads: [],
         resourceType,
         documentGraph,
-        subject: quad.subject!,
-        queryOverride: true
+        requestURL: targetUrl.toString(),
+        subject: quad.subject!
+        // mutationHandled: true
       } as IntermediateResult)
   )[0];
 }

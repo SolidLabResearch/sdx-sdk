@@ -19,9 +19,14 @@ import {
   IntermediateResult,
   ResourceType,
   getCurrentDirective,
+  getDirectives,
   getRawType
 } from './impl/utils';
-import { StaticTargetResolver, TargetResolver } from './target-resolvers';
+import {
+  StaticTargetResolver,
+  TargetResolver,
+  TargetResolverContext
+} from './target-resolvers';
 import { perfLogger } from '../../../commons/logger';
 import { printQuads } from '../../../commons/util';
 
@@ -54,15 +59,18 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
   private mutationHandler: MutationHandler;
   private rootTypes: string[] = [];
   private parser: ShaclReaderService;
+  private ldpClient: LdpClient;
+  private targetResolverContext: TargetResolverContext;
 
   constructor(options?: SolidLDPBackendOptions) {
     // TODO: Use schema to parse, instead of SHACL files
     // Default to generated schema location
     this.schemaFile = options?.schemaFile || URI_SDX_GENERATE_GRAPHQL_SCHEMA;
     this.defaultContext = options?.defaultContext;
-    const ldpClient = new LdpClient(options?.clientCredentials);
-    this.queryHandler = new QueryHandler(ldpClient);
-    this.mutationHandler = new MutationHandler(ldpClient);
+    this.ldpClient = new LdpClient(options?.clientCredentials);
+    this.targetResolverContext = new TargetResolverContext(this.ldpClient);
+    this.queryHandler = new QueryHandler(this.ldpClient);
+    this.mutationHandler = new MutationHandler(this.ldpClient);
     this.parser = new ShaclReaderService();
   }
 
@@ -101,16 +109,20 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     // FIXME: If source is empty, set default
     if (!source) {
       source = {
-        quads: [],
         resourceType: ResourceType.DOCUMENT
       };
     }
 
     // IF Directive @identifier is present
     const directive = getCurrentDirective(info);
-    console.log(info.path, directive);
     if ('identifier' in directive) {
-      console.log('IDENTFIIER');
+      console.log('IDENTIFIER');
+      const parentClassUri = getDirectives(info.parentType).is.class;
+      const targetUrl = await context.resolver.resolve(
+        parentClassUri,
+        this.targetResolverContext
+      );
+      source.requestURL = targetUrl.toString();
       return this.queryHandler.handleIdProperty(source, args, context, info);
     } else if ('property' in directive) {
       const rawType = getRawType(
@@ -137,13 +149,12 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     } else {
       console.log('ELSE');
       // IF MUTATION
-      if ('mutation' === info.operation.operation && !source.queryOverride) {
-        return this.mutationHandler.handleMutation(
+      if ('mutation' === info.operation.operation && !source.mutationHandled) {
+        return this.mutationHandler.handleMutationEntrypoint(
           source,
           args,
           context,
-          info,
-          this.rootTypes
+          info
         );
       } else {
         // printQuads(source.quads, 'override');

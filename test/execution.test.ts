@@ -10,15 +10,30 @@ import {
   getContacts,
   setAddress
 } from './assets/gql/my-queries';
-import { readFile } from 'fs/promises';
+import { readFile, readdir, rm, writeFile } from 'fs/promises';
 import { Parser, Store, Writer } from 'n3';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
+const pickDataFile = async () => {
+  const files = await readdir('test/assets/data');
+  return files.includes('contacts.ttl.patch')
+    ? await readFile('test/assets/data/contacts.ttl.patch')
+    : await readFile('test/assets/data/contacts.ttl');
+};
+
+const resetDataFile = async () => {
+  for (const file of await readdir('test/assets/data')) {
+    if (file === 'contacts.ttl.patch') {
+      await rm('test/assets/data/contacts.ttl.patch');
+    }
+  }
+};
+
 mockedAxios.get.mockImplementation(async (uri) => {
   if (uri === 'http://mock/data' || uri.startsWith('http://mock/data')) {
-    const data = await readFile('test/assets/data/contacts.ttl');
+    const data = await pickDataFile();
     return { data: data.toString() };
   }
 
@@ -31,25 +46,31 @@ mockedAxios.get.mockImplementation(async (uri) => {
 });
 
 mockedAxios.patch.mockImplementation(async (url, data) => {
-  const contacts_data = await readFile('test/assets/data/contacts.ttl');
+  console.log('MOCK CALLED');
+  const contacts_data = await pickDataFile();
   const quads = new Parser({ format: 'text/turtle' }).parse(
     contacts_data.toString()
   );
   const store = new Store(quads);
   const { inserts, deletes } = parseInsertsDeletes(data as string);
 
-  // console.log('inserts', inserts);
-  // console.log('deletes', deletes);
+  console.log('inserts', inserts);
+  console.log('deletes', deletes);
 
   store.removeQuads(deletes);
   store.addQuads(inserts);
   const writer = new Writer({ format: 'text/turtle' });
+
   writer.addQuads(store.getQuads(null, null, null, null));
+  console.log('getting here');
   return new Promise((resolve) => {
-    writer.end(() => {
-      resolve({
-        status: 201,
-        statusText: 'Created'
+    writer.end((error, res) => {
+      console.log('writing', res);
+      writeFile('test/assets/data/contacts.ttl.patch', res).then(() => {
+        resolve({
+          status: 201,
+          statusText: 'Created'
+        });
       });
     });
   });
@@ -62,7 +83,11 @@ describe('A GQL Schema can execute', () => {
     defaultContext: context
   });
 
-  it.only('a query (single)', async () => {
+  beforeEach(async () => {
+    await resetDataFile();
+  });
+
+  it('a query (single)', async () => {
     const result = await ldpBackend.requester.call(
       ldpBackend.requester,
       getContact,
@@ -123,6 +148,7 @@ describe('A GQL Schema can execute', () => {
       createContact,
       { input }
     );
+    console.log(result);
     expect(result).not.toBeUndefined();
     expect(result.data).not.toBeUndefined();
     expect(result.data).toHaveProperty('createContact');
