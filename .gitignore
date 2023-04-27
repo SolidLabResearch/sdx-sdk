@@ -5,4 +5,5 @@ coverage
 
 
 .vscode/
-contact.ttl.patch
+
+test/assets/data/contacts.ttl.patch
