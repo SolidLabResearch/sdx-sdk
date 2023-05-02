@@ -136,3 +136,83 @@ export const removeWorksFor = gql`
     }
   }
 `;
+
+export const linkSetAddress = gql`
+  mutation linkSetAddress($id: ID!, $link: ID!) {
+    mutateContact(id: $id) {
+      linkAddress(id: $link) {
+        id
+        givenName
+        familyName
+        address {
+          streetLine
+          postalCode
+          city
+          country
+        }
+      }
+    }
+  }
+`;
+
+export const linkAddWorksFor = gql`
+  mutation linkAddWorksFor($id: ID!, $link: ID!) {
+    mutateContact(id: $id) {
+      linkWorksFor(id: $link) {
+        id
+        givenName
+        familyName
+        address {
+          streetLine
+          postalCode
+          city
+          country
+        }
+        worksFor {
+          id
+          name
+        }
+      }
+    }
+  }
+`;
+
+export const unlinkClearAddress = gql`
+  mutation unlinkClearAddress($id: ID!, $link: ID!) {
+    mutateContact(id: $id) {
+      unlinkAddress(id: $link) {
+        id
+        givenName
+        familyName
+        address {
+          streetLine
+          postalCode
+          city
+          country
+        }
+      }
+    }
+  }
+`;
+
+export const unlinkRemoveWorksFor = gql`
+  mutation unlinkRemoveWorksFor($id: ID!, $link: ID!) {
+    mutateContact(id: $id) {
+      unlinkWorksFor(id: $link) {
+        id
+        givenName
+        familyName
+        address {
+          streetLine
+          postalCode
+          city
+          country
+        }
+        worksFor {
+          id
+          name
+        }
+      }
+    }
+  }
+`;

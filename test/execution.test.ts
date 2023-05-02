@@ -9,8 +9,12 @@ import {
   flipNames,
   getContact,
   getContacts,
+  linkAddWorksFor,
+  linkSetAddress,
   removeWorksFor,
-  setAddress
+  setAddress,
+  unlinkClearAddress,
+  unlinkRemoveWorksFor
 } from './assets/gql/my-queries';
 import { readFile, readdir, rm, writeFile } from 'fs/promises';
 import { Parser, Store, Writer } from 'n3';
@@ -55,18 +59,13 @@ mockedAxios.patch.mockImplementation(async (url, data) => {
   const store = new Store(quads);
   const { inserts, deletes } = parseInsertsDeletes(data as string);
 
-  console.log('inserts', inserts);
-  console.log('deletes', deletes);
-
   store.removeQuads(deletes);
   store.addQuads(inserts);
   const writer = new Writer({ format: 'text/turtle' });
 
   writer.addQuads(store.getQuads(null, null, null, null));
-  console.log('getting here');
   return new Promise((resolve) => {
     writer.end((error, res) => {
-      console.log('writing', res);
       writeFile('test/assets/data/contacts.ttl.patch', res).then(() => {
         resolve({
           status: 201,
@@ -149,7 +148,6 @@ describe('A GQL Schema can execute', () => {
       createContact,
       { input }
     );
-    console.log(result);
     expect(result).not.toBeUndefined();
     expect(result.data).not.toBeUndefined();
     expect(result.data).toHaveProperty('createContact');
@@ -314,21 +312,108 @@ describe('A GQL Schema can execute', () => {
     });
   });
 
-  // it('a mutation (link [set] non-scalar)', async () => {
-  //   expect(true).toBeFalse();
-  // });
+  it('a mutation (link [set] non-scalar)', async () => {
+    const link = 'http://example.org/addr/work';
+    const id = 'http://example.org/cont/tdupont';
+    const result = await ldpBackend.requester.call(
+      ldpBackend.requester,
+      linkSetAddress,
+      {
+        id,
+        link
+      }
+    );
+    expect(result).not.toBeUndefined();
+    expect(result.data).not.toBeUndefined();
+    expect(result.data).toHaveProperty('mutateContact');
+    const contact = (result.data! as any).mutateContact;
+    expect(contact.linkAddress).toEqual({
+      id,
+      givenName: 'Thomas',
+      familyName: 'Dupont',
+      address: {
+        streetLine: 'Technologiepark-Zwijnaarde 126',
+        postalCode: '9052',
+        city: 'Zwijnaarde',
+        country: 'Belgium'
+      }
+    });
+  });
 
-  // it('a mutation (link [add] non-scalar)', async () => {
-  //   expect(true).toBeFalse();
-  // });
+  it('a mutation (link [add] non-scalar)', async () => {
+    const link = 'http://example.org/org/ugent';
+    const id = 'http://example.org/cont/tdupont';
+    const result = await ldpBackend.requester.call(
+      ldpBackend.requester,
+      linkAddWorksFor,
+      {
+        id,
+        link
+      }
+    );
+    expect(result).not.toBeUndefined();
+    expect(result.data).not.toBeUndefined();
+    expect(result.data).toHaveProperty('mutateContact');
+    const contact = (result.data! as any).mutateContact;
+    expect(contact.linkWorksFor).toEqual({
+      id,
+      givenName: 'Thomas',
+      familyName: 'Dupont',
+      address: {
+        streetLine: 'Gerard Franchoostraat 6',
+        postalCode: '8200',
+        city: 'Brugge',
+        country: 'Belgium'
+      },
+      worksFor: [
+        { id: 'http://example.org/org/idlab', name: 'IDLab Gent' },
+        { id: link, name: 'Ghent University' }
+      ]
+    });
+  });
 
-  // it('a mutation (unlink [clear] non-scalar)', async () => {
-  //   expect(true).toBeFalse();
-  // });
+  it('a mutation (unlink [clear] non-scalar)', async () => {
+    const id = 'http://example.org/cont/tdupont';
+    const link = 'http://example.org/addr/home';
+    const result = await ldpBackend.requester.call(
+      ldpBackend.requester,
+      unlinkClearAddress,
+      { id, link }
+    );
+    expect(result).not.toBeUndefined();
+    expect(result.data).not.toBeUndefined();
+    expect(result.data).toHaveProperty('mutateContact');
+    const contact = (result.data! as any).mutateContact;
+    expect(contact.unlinkAddress).toEqual({
+      id,
+      givenName: 'Thomas',
+      familyName: 'Dupont',
+      address: null
+    });
+  });
 
-  // it('a mutation (unlink [remove] non-scalar)', async () => {
-  //   expect(true).toBeFalse();
-  // });
+  it('a mutation (unlink [remove] non-scalar)', async () => {
+    const id = 'http://example.org/cont/pdemeest';
+    const link = 'http://example.org/org/idlab';
+    const result = await ldpBackend.requester.call(
+      ldpBackend.requester,
+      unlinkRemoveWorksFor,
+      { id, link }
+    );
+    expect(result).not.toBeUndefined();
+    expect(result.data).not.toBeUndefined();
+    expect(result.data).toHaveProperty('mutateContact');
+    const contact = (result.data! as any).mutateContact;
+    expect(contact.unlinkWorksFor).toEqual({
+      id,
+      givenName: 'Piet',
+      familyName: 'Demeester',
+      address: null,
+      worksFor: [
+        { id: 'http://example.org/org/ugent', name: 'Ghent University' }
+      ]
+    });
+  });
 });
 
 function parseInsertsDeletes(data: string) {
