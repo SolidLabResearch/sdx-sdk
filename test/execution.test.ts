@@ -2,6 +2,7 @@ import axios from 'axios';
 
 import { SolidLDPBackend, SolidLDPContext } from '../src';
 import {
+  addWorksFor,
   clearAddress,
   createContact,
   deleteContact,
@@ -201,7 +202,7 @@ describe('A GQL Schema can execute', () => {
     });
   });
 
-  it('a mutation (set single non-scalar)', async () => {
+  it('a mutation (set non-scalar)', async () => {
     const obj = {
       id: 'http://example.org/cont/tdupont',
       streetLine: 'Heidestraat 92',
@@ -254,9 +255,41 @@ describe('A GQL Schema can execute', () => {
     });
   });
 
-  // it('a mutation (add non-scalar)', async () => {
-  //   expect(true).toBeFalse();
-  // });
+  it('a mutation (add non-scalar)', async () => {
+    const id = 'http://example.org/cont/tdupont';
+    const input = {
+      id: 'http://example.org/org/extra',
+      name: 'Extra'
+    };
+    const result = await ldpBackend.requester.call(
+      ldpBackend.requester,
+      addWorksFor,
+      {
+        id,
+        input
+      }
+    );
+    expect(result).not.toBeUndefined();
+    expect(result.data).not.toBeUndefined();
+    expect(result.data).toHaveProperty('mutateContact');
+    const contact = (result.data! as any).mutateContact;
+    console.log(JSON.stringify(result.data));
+    expect(contact.addWorksFor).toEqual({
+      id,
+      givenName: 'Thomas',
+      familyName: 'Dupont',
+      address: {
+        streetLine: 'Gerard Franchoostraat 6',
+        postalCode: '8200',
+        city: 'Brugge',
+        country: 'Belgium'
+      },
+      worksFor: [
+        { id: 'http://example.org/org/idlab', name: 'IDLab Gent' },
+        { id: input.id, name: input.name }
+      ]
+    });
+  });
 
   // it('a mutation (remove non-scalar)', async () => {
   //   expect(true).toBeFalse();

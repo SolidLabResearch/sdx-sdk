@@ -92,3 +92,25 @@ export const clearAddress = gql`
     }
   }
 `;
+
+export const addWorksFor = gql`
+  mutation addWorksFor($id: ID!, $input: CreateOrganizationInput!) {
+    mutateContact(id: $id) {
+      addWorksFor(input: $input) {
+        id
+        givenName
+        familyName
+        address {
+          streetLine
+          postalCode
+          city
+          country
+        }
+        worksFor {
+          id
+          name
+        }
+      }
+    }
+  }
+`;
