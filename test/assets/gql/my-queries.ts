@@ -114,3 +114,25 @@ export const addWorksFor = gql`
     }
   }
 `;
+
+export const removeWorksFor = gql`
+  mutation removeWorksFor($id: ID!, $orgId: ID!) {
+    mutateContact(id: $id) {
+      removeWorksFor(id: $orgId) {
+        id
+        givenName
+        familyName
+        address {
+          streetLine
+          postalCode
+          city
+          country
+        }
+        worksFor {
+          id
+          name
+        }
+      }
+    }
+  }
+`;

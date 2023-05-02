@@ -9,6 +9,7 @@ import {
   flipNames,
   getContact,
   getContacts,
+  removeWorksFor,
   setAddress
 } from './assets/gql/my-queries';
 import { readFile, readdir, rm, writeFile } from 'fs/promises';
@@ -273,7 +274,6 @@ describe('A GQL Schema can execute', () => {
     expect(result.data).not.toBeUndefined();
     expect(result.data).toHaveProperty('mutateContact');
     const contact = (result.data! as any).mutateContact;
-    console.log(JSON.stringify(result.data));
     expect(contact.addWorksFor).toEqual({
       id,
       givenName: 'Thomas',
@@ -291,9 +291,28 @@ describe('A GQL Schema can execute', () => {
     });
   });
 
-  // it('a mutation (remove non-scalar)', async () => {
-  //   expect(true).toBeFalse();
-  // });
+  it('a mutation (remove non-scalar)', async () => {
+    const id = 'http://example.org/cont/pdemeest';
+    const orgId = 'http://example.org/org/idlab';
+    const result = await ldpBackend.requester.call(
+      ldpBackend.requester,
+      removeWorksFor,
+      { id, orgId }
+    );
+    expect(result).not.toBeUndefined();
+    expect(result.data).not.toBeUndefined();
+    expect(result.data).toHaveProperty('mutateContact');
+    const contact = (result.data! as any).mutateContact;
+    expect(contact.removeWorksFor).toEqual({
+      id,
+      givenName: 'Piet',
+      familyName: 'Demeester',
+      address: null,
+      worksFor: [
+        { id: 'http://example.org/org/ugent', name: 'Ghent University' }
+      ]
+    });
+  });
 
   // it('a mutation (link [set] non-scalar)', async () => {
   //   expect(true).toBeFalse();

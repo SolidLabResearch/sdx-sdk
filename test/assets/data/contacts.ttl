@@ -23,4 +23,13 @@
 <http://example.org/cont/pdemeest> a <http://schema.org/Person>;
     <http://schema.org/givenName> "Piet";
     <http://schema.org/familyName> "Demeester";
-    <http://schema.org/worksFor> <http://example.org/org/idlab>.
+    <http://schema.org/worksFor> <http://example.org/org/idlab>;
+    <http://schema.org/worksFor> <http://example.org/org/ugent>.
+<http://example.org/org/ugent> a <http://schema.org/Organization>;
+    <http://schema.org/address> <http://example.org/addr/ugent>;
+    <http://schema.org/name> "Ghent University".
+<http://example.org/addr/ugent> a <http://schema.org/PostalAddress>;
+    <http://schema.org/streetAddress> "Sint-Pietersnieuwstraat 1";
+    <http://schema.org/postalCode> "9000";
+    <http://schema.org/addressLocality> "Gent";
+    <http://schema.org/addressCountry> "Belgium".

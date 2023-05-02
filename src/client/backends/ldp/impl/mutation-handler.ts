@@ -50,7 +50,8 @@ export class MutationHandler {
       return this.handleClearMutation(source, args, context, info);
     if (fieldName.startsWith('add'))
       return this.handleAddMutation(source, args, context, info);
-    if (fieldName.startsWith('remove')) return this.TODO();
+    if (fieldName.startsWith('remove'))
+      return this.handleRemoveMutation(source, args, context, info);
     if (fieldName.startsWith('link')) return this.TODO();
     if (fieldName.startsWith('unlink')) return this.TODO();
     // Mutation handler can't solve it, maybe the query handler can?
@@ -280,7 +281,6 @@ export class MutationHandler {
         );
     }
 
-    printQuads(deletes, 'deletes');
     // Reconstruct object
     const store = new Store(source.documentGraph?.getQuads());
     store.removeQuads(deletes);
@@ -340,6 +340,54 @@ export class MutationHandler {
     // Reconstruct object
     const store = new Store(source.documentGraph!.getQuads());
     store.addQuads(inserts);
+    source.documentGraph = new Graph(store.getQuads(null, null, null, null));
+    return this.mutationHandled(source);
+  }
+
+  private async handleRemoveMutation<TArgs>(
+    source: IntermediateResult,
+    args: TArgs,
+    context: SolidLDPContext,
+    info: GraphQLResolveInfo
+  ): Promise<IntermediateResult> {
+    // Grab id of the parent object
+    const parentId = source.subject!;
+    // Grab the type of the return object
+    const returnType = info.schema.getType(
+      utils.unwrapNonNull(info.returnType).toString()
+    ) as GraphQLObjectType;
+    const classUri = this.getDirectives(returnType).is['class'];
+    const targetUrl = await context.resolver.resolve(
+      classUri,
+      new TargetResolverContext(this.ldpClient)
+    );
+
+    const id = (args as any).id;
+
+    // What is the type of the parentField that we have to clear.
+    const fieldName = decapitalize(info.fieldName.slice('remove'.length));
+    const predicate = this.getDirectives(returnType.getFields()[fieldName]!)
+      .property['iri'];
+    const deletes = source.documentGraph!.find(
+      parentId,
+      namedNode(predicate),
+      namedNode(id)
+    );
+
+    switch (source.resourceType!) {
+      case ResourceType.DOCUMENT:
+        // Update triples in doc using patch
+        await new LdpClient().patchDocument(
+          targetUrl.toString(),
+          null,
+          deletes
+        );
+    }
+
+    printQuads(deletes, 'deletes');
+    // Reconstruct object
+    const store = new Store(source.documentGraph?.getQuads());
+    store.removeQuads(deletes);
     source.documentGraph = new Graph(store.getQuads(null, null, null, null));
     return this.mutationHandled(source);
   }
