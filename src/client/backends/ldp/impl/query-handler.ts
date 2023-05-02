@@ -57,7 +57,6 @@ export class QueryHandler {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult | IntermediateResult[]> {
-    console.log('handleRelationProperty');
     const iri = namedNode(getCurrentDirective(info).property!.iri);
     const type = info.parentType.getFields()[info.fieldName]!.type;
     const classUri = getClassURI(type);

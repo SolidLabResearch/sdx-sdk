@@ -14,8 +14,6 @@ export class Shape {
    * @param context Any toplevel quads that have a BlankNode subject
    */
   constructor(public quads: Quad[], context: Context) {
-    // console.log(quads);
-    // console.log(context)
     const store = new Store(quads);
     this.name = this.parseName(store);
     this.targetClass = this.parseObject(store, vocab.SHACL.targetClass);
