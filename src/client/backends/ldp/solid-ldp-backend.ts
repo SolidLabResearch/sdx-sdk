@@ -93,22 +93,22 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     info: GraphQLResolveInfo
   ): Promise<unknown> => {
     // FIXME: If source is empty, set default
-    if (!source) {
-      source = {
-        resourceType: ResourceType.DOCUMENT
-      };
-    }
+    // if (!source) {
+    //   source = {
+    //     resourceType: ResourceType.DOCUMENT
+    //   };
+    // }
 
     // IF Directive @identifier is present
     const directive = getCurrentDirective(info);
     if ('identifier' in directive) {
-      const parentClassUri = getDirectives(info.parentType).is.class;
-      const targetUrl = await context.resolver.resolve(
-        parentClassUri,
-        this.targetResolverContext
-      );
-      source.requestURL = targetUrl.toString();
-      return this.queryHandler.handleIdProperty(source, args, context, info);
+      // const parentClassUri = getDirectives(info.parentType).is.class;
+      // const targetUrl = await context.resolver.resolve(
+      //   parentClassUri,
+      //   this.targetResolverContext
+      // );
+      // source.requestURL = targetUrl;
+      return this.queryHandler.handleIdProperty(source);
     } else if ('property' in directive) {
       // IF Directive @property is present
       const rawType = getRawType(
@@ -116,25 +116,15 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
       );
       // IF Scalar
       if (isScalarType(rawType)) {
-        return this.queryHandler.handleScalarProperty(
-          source,
-          args,
-          context,
-          info
-        );
+        return this.queryHandler.handleScalarProperty(source, info);
       }
       // else Relation
       else {
-        return this.queryHandler.handleRelationProperty(
-          source,
-          args,
-          context,
-          info
-        );
+        return this.queryHandler.handleRelationProperty(source, info);
       }
     } else {
       // IF MUTATION
-      if ('mutation' === info.operation.operation && !source.mutationHandled) {
+      if ('mutation' === info.operation.operation && !source?.mutationHandled) {
         return this.mutationHandler.handleMutationEntrypoint(
           source,
           args,

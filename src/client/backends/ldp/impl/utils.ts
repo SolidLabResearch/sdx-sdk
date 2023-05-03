@@ -21,12 +21,19 @@ import {
   Parser,
   Quad,
   Store,
+  Term,
   Variable
 } from 'n3';
 import { Graph, LdpClient, vocab } from '../../../../commons';
 import { RDFS } from '../../../../commons/vocab';
 
 const { namedNode } = DataFactory;
+
+export type Primitive = boolean | number | string;
+export enum ResourceType {
+  CONTAINER,
+  DOCUMENT
+}
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 export async function getSubGraphArray(
@@ -108,26 +115,45 @@ export function getRawType(type: GraphQLType): GraphQLNamedType {
   return type;
 }
 
-export enum ResourceType {
-  CONTAINER,
-  DOCUMENT
-}
-
-export interface IntermediateResult {
-  requestURL?: string;
-  documentGraph?: Graph;
-  /**
-   * @deprecated Use `documentGraph` instead
-   */
-  quads?: Quad[];
-  /**
-   * @deprecated
-   */
-  parentClassIri?: string;
+export interface IntermediateResultInput {
+  requestURL?: URL;
+  documentGraph: Graph;
   resourceType: ResourceType;
   /** The subject node that we descended into */
-  subject?: NamedNode | BlankNode | Variable;
+  subject?: Term;
   mutationHandled?: boolean;
+}
+
+export class IntermediateResult {
+  requestURL?: URL;
+  documentGraph: Graph;
+  resourceType: ResourceType;
+  /** The subject node that we descended into */
+  subject?: Term;
+  mutationHandled?: boolean;
+
+  constructor(input: IntermediateResultInput) {
+    this.requestURL = input.requestURL;
+    this.documentGraph = input.documentGraph;
+    this.resourceType = input.resourceType;
+    this.subject = input.subject;
+    this.mutationHandled = input.mutationHandled;
+  }
+
+  static copy(
+    source: IntermediateResult,
+    override?: Partial<IntermediateResultInput>
+  ): IntermediateResult {
+    const copy = override ? { ...source, ...override } : source;
+    return new IntermediateResult(copy);
+  }
+
+  getFQSubject(): string {
+    const subject = this.subject?.value ?? '';
+    return subject.length === 0 || subject.startsWith('#')
+      ? this.requestURL!.toString().concat(subject)
+      : subject;
+  }
 }
 
 export function getClassURI(type: GraphQLType): NamedNode {
@@ -175,17 +201,19 @@ export async function getInstanceById(
   const documentGraph = await ldpCLient.downloadDocumentGraph(documentUrl);
   return documentGraph.find(namedNode(id), RDFS.a, classUri).map(
     (quad) =>
-      ({
+      new IntermediateResult({
+        requestURL: targetUrl,
         resourceType,
         documentGraph,
-        requestURL: targetUrl.toString(),
         subject: quad.subject!
-        // mutationHandled: true
-      } as IntermediateResult)
+      })
   )[0];
 }
 
-export function convertScalarValue(type: GraphQLType, literal: string): any {
+export function convertScalarValue(
+  type: GraphQLType,
+  literal: string
+): Primitive {
   if (!isScalarType(type)) {
     throw new Error(`Type ${type} is not a scalar type`);
   }

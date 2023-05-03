@@ -6,6 +6,7 @@ import { SolidLDPContext } from '../solid-ldp-backend';
 import { TargetResolverContext } from '../target-resolvers';
 import {
   IntermediateResult,
+  Primitive,
   ResourceType,
   convertScalarValue,
   getClassURI,
@@ -13,67 +14,73 @@ import {
   getInstanceById,
   getRawType
 } from './utils';
-import { doc } from 'prettier';
 
 const { namedNode } = DataFactory;
 
 export class QueryHandler {
   constructor(private ldpClient: LdpClient) {}
 
-  async handleIdProperty<TArgs>(
-    source: IntermediateResult,
-    args: TArgs,
-    context: SolidLDPContext,
-    info: GraphQLResolveInfo
-  ): Promise<string> {
-    const subject = source.subject?.value ?? '';
-    const result =
-      subject.length === 0 || subject.startsWith('#')
-        ? source.requestURL!.concat(subject)
-        : subject;
-    return result;
+  /**
+   * Handler for an id property.
+   * @param source
+   */
+  handleIdProperty(source: IntermediateResult): string {
+    return source.getFQSubject();
   }
 
-  async handleScalarProperty<TArgs>(
+  /**
+   * Handler for a scalar property.
+   * @param source
+   * @param info
+   */
+  async handleScalarProperty(
     source: IntermediateResult,
-    args: TArgs,
-    context: SolidLDPContext,
     info: GraphQLResolveInfo
-  ): Promise<any> {
+  ): Promise<Primitive | Primitive[]> {
     const iri = namedNode(getCurrentDirective(info).property!.iri);
     const type = info.parentType.getFields()[info.fieldName]!.type;
     const rawType = getRawType(type);
-    const result = source
-      .documentGraph!.find(source.subject!, iri, null)
+    const result = source.documentGraph
+      .find(source.subject!, iri, null)
       .map((quad) => convertScalarValue(rawType, quad.object.value));
     return isListType(type) || (isNonNullType(type) && isListType(type.ofType))
       ? result
       : result[0]!;
   }
 
-  async handleRelationProperty<TArgs>(
+  /**
+   * Handler for a relation property.
+   * This is a yet unresolved property that will be resolved later on.
+   * @param source
+   * @param info
+   */
+  async handleRelationProperty(
     source: IntermediateResult,
-    args: TArgs,
-    context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult | IntermediateResult[]> {
     const iri = namedNode(getCurrentDirective(info).property!.iri);
     const type = info.parentType.getFields()[info.fieldName]!.type;
     const classUri = getClassURI(type);
-    const result = source
-      .documentGraph!.find(source.subject!, iri, null)
+    const result = source.documentGraph
+      .find(source.subject!, iri, null)
       .filter(
         (quad) =>
-          source.documentGraph!.find(quad.object, RDFS.a, classUri).length > 0
+          source.documentGraph.find(quad.object, RDFS.a, classUri).length > 0
       )
-      .map(
-        (quad) => ({ ...source, subject: quad.object } as IntermediateResult)
-      );
+      .map((quad) => IntermediateResult.copy(source, { subject: quad.object }));
     return isListType(type) || (isNonNullType(type) && isListType(type.ofType))
       ? result
       : result[0]!;
   }
 
+  /**
+   * Handler for a query entrypoint.
+   * This is the first handler for aueries.
+   * @param source
+   * @param args
+   * @param context
+   * @param info
+   */
   async handleQueryEntrypoint<TArgs>(
     source: IntermediateResult,
     args: TArgs,
@@ -81,7 +88,6 @@ export class QueryHandler {
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult | IntermediateResult[] | undefined> {
     // FIXME: temporary set resourcetype
-    source.resourceType = ResourceType.DOCUMENT;
 
     const classUri = getClassURI(info.returnType);
     const targetUrl = await context.resolver.resolve(
@@ -89,8 +95,9 @@ export class QueryHandler {
       new TargetResolverContext(this.ldpClient)
     );
     if (targetUrl != null) {
+      const resourceType = await this.ldpClient.fetchResourceType(targetUrl);
       // Identifier could be passed as argument or be part of the source (subject)
-      const id = (args as any).id ?? source.subject?.value;
+      const id = (args as any).id ?? source?.subject?.value;
       if (id !== null && id !== undefined) {
         // Instance entrypoint
         return getInstanceById(
@@ -98,20 +105,22 @@ export class QueryHandler {
           targetUrl,
           id,
           classUri,
-          source.resourceType
+          resourceType
         );
       } else {
         // Collection entrypoint
-        const documentGraph = await this.ldpClient.downloadDocumentGraph(
-          targetUrl
-        );
+        const documentGraph =
+          resourceType === ResourceType.DOCUMENT
+            ? await this.ldpClient.downloadDocumentGraph(targetUrl)
+            : await this.ldpClient.downloadContainerAsGraph(targetUrl);
         return documentGraph.find(null, RDFS.a, classUri).map(
           (quad) =>
-            ({
-              ...source,
+            new IntermediateResult({
+              requestURL: targetUrl,
+              resourceType,
               documentGraph,
               subject: quad.subject
-            } as IntermediateResult)
+            })
         );
       }
     } else {

@@ -1,10 +1,9 @@
-import { NamedNode, Quad, Store, Term } from 'n3';
-import { RDFS } from './vocab';
+import { Quad, Store, Term } from 'n3';
 
 export class Graph {
   private store: Store;
 
-  constructor(quads: Quad[]) {
+  constructor(quads: Quad[] = []) {
     this.store = new Store(quads);
   }
 
@@ -22,5 +21,20 @@ export class Graph {
 
   getQuads(): Quad[] {
     return this.store.getQuads(null, null, null, null);
+  }
+
+  add(...quads: Quad[]): Graph {
+    this.store.addQuads(quads);
+    return this;
+  }
+
+  remove(...quads: Quad[]): Graph {
+    this.store.removeQuads(quads);
+    return this;
+  }
+
+  addGraph(graph: Graph): Graph {
+    this.store.addQuads(graph.getQuads());
+    return this;
   }
 }

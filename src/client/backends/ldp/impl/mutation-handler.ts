@@ -9,10 +9,10 @@ import {
   isNonNullType,
   isScalarType
 } from 'graphql';
-import { BlankNode, DataFactory, NamedNode, Quad, Store, Variable } from 'n3';
+import { DataFactory, NamedNode, Quad, Term } from 'n3';
 import { v4 as uuidv4 } from 'uuid';
 import { Graph, LdpClient, utils, vocab } from '../../../../commons';
-import { decapitalize, printQuads } from '../../../../commons/util';
+import { decapitalize } from '../../../../commons/util';
 import { SolidLDPContext } from '../solid-ldp-backend';
 import { TargetResolverContext } from '../target-resolvers';
 import {
@@ -30,119 +30,144 @@ export class MutationHandler {
   constructor(private ldpClient: LdpClient) {}
 
   async handleMutationEntrypoint<TArgs>(
-    source: IntermediateResult,
+    source: IntermediateResult | undefined,
     args: TArgs,
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult | void> {
     const { fieldName } = info;
     if (fieldName === 'delete')
-      return this.handleDeleteMutation(source, args, context, info);
+      return this.handleDeleteMutation(source!, context, info);
     if (fieldName === 'update')
-      return this.handleUpdateMutation(source, args, context, info);
+      return this.handleUpdateMutation(source!, args, context, info);
     if (fieldName.startsWith('create'))
-      return this.handleCreateMutation(source, args, context, info);
+      return this.handleCreateMutation(args, context, info);
     if (fieldName.startsWith('mutate'))
-      return this.handleGetMutateObjectType(source, args, context, info);
+      return this.handleGetMutateObjectType(args, context, info);
     if (fieldName.startsWith('set'))
-      return this.handleSetMutation(source, args, context, info);
+      return this.handleSetMutation(source!, args, context, info);
     if (fieldName.startsWith('clear'))
-      return this.handleClearMutation(source, args, context, info);
+      return this.handleClearMutation(source!, context, info);
     if (fieldName.startsWith('add'))
-      return this.handleAddMutation(source, args, context, info);
+      return this.handleAddMutation(source!, args, context, info);
     if (fieldName.startsWith('remove'))
-      return this.handleRemoveMutation(source, args, context, info);
+      return this.handleRemoveMutation(source!, args, context, info);
     if (fieldName.startsWith('link'))
-      return this.handleLinkMutation(source, args, context, info);
+      return this.handleLinkMutation(source!, args, context, info);
     if (fieldName.startsWith('unlink'))
-      return this.handleUnlinkMutation(source, args, context, info);
+      return this.handleUnlinkMutation(source!, args, context, info);
     // Mutation handler can't solve it, maybe the query handler can?
-    return this.mutationHandled(source);
+    return this.mutationHandled(source!);
   }
 
   private async handleCreateMutation<TArgs>(
-    source: IntermediateResult,
     args: TArgs,
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
-    const className = this.getDirectives(info.returnType).is['class'];
+    const classUri = namedNode(this.getDirectives(info.returnType).is['class']);
     const targetUrl = await context.resolver.resolve(
-      className,
+      classUri.value,
       new TargetResolverContext(this.ldpClient)
     );
-    // Create mutations should always have an input argument.
-    const input = (args as any).input;
-    source.subject = namedNode(
-      this.getNewInstanceID(input, source.resourceType!)
-    );
-    const inputType = info.parentType
-      .getFields()
-      [info.fieldName]!.args.find((arg) => arg.name === 'input')!.type;
-    const quads = this.generateTriplesForInput(
-      source.subject,
-      input,
-      utils.unwrapNonNull(inputType) as GraphQLInputObjectType,
-      namedNode(className)
-    );
-    source.documentGraph = new Graph(quads);
-    switch (source.resourceType!) {
-      case ResourceType.DOCUMENT:
-        // Append triples to doc using patch
-        await new LdpClient().patchDocument(targetUrl.toString(), quads);
+    if (targetUrl) {
+      const resourceType = await this.ldpClient.fetchResourceType(targetUrl);
+      // Create mutations should always have an input argument.
+      const input = (args as any).input;
+      const id = namedNode(this.getNewInstanceID(input, resourceType));
+      const inputType = info.parentType
+        .getFields()
+        [info.fieldName]!.args.find((arg) => arg.name === 'input')!.type;
+      const content = new Graph(
+        this.generateTriplesForInput(
+          id,
+          input,
+          utils.unwrapNonNull(inputType) as GraphQLInputObjectType,
+          classUri
+        )
+      );
+      switch (resourceType) {
+        case ResourceType.DOCUMENT: {
+          await new LdpClient().patchDocument(targetUrl, content.getQuads());
+          return this.mutationHandled(
+            new IntermediateResult({
+              requestURL: targetUrl,
+              resourceType,
+              documentGraph: content,
+              subject: id
+            })
+          );
+        }
+        case ResourceType.CONTAINER: {
+          const newDocumentURL = this.getNewDocumentURL(targetUrl, input);
+          await this.ldpClient.putDocument(newDocumentURL, content);
+          return this.mutationHandled(
+            new IntermediateResult({
+              requestURL: newDocumentURL,
+              resourceType,
+              documentGraph: content,
+              subject: id
+            })
+          );
+        }
+      }
+    } else {
+      throw new Error('A target URL for this request could not be resolved!');
     }
-    return this.mutationHandled(source);
   }
 
   private async handleGetMutateObjectType<TArgs>(
-    source: IntermediateResult,
     args: TArgs,
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult | undefined> {
-    const className = getDirectives(info.returnType).is['class'];
+    const classUri = namedNode(getDirectives(info.returnType).is['class']);
     const targetUrl = await context.resolver.resolve(
-      className,
+      classUri.value,
       new TargetResolverContext(this.ldpClient)
     );
 
-    if (targetUrl.toString()) {
+    if (targetUrl) {
+      const resourceType = await this.ldpClient.fetchResourceType(targetUrl);
       return getInstanceById(
         this.ldpClient,
         targetUrl,
         (args as any).id,
-        className,
-        source.resourceType
+        classUri,
+        resourceType
       );
     } else {
       throw new Error('A target URL for this request could not be resolved!');
     }
   }
 
-  /* eslint-disable @typescript-eslint/no-unused-vars */
-  private async handleDeleteMutation<TArgs>(
+  private async handleDeleteMutation(
     source: IntermediateResult,
-    args: TArgs,
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
-    const classIri = this.getDirectives(info.parentType).is['class'];
+    const classUri = namedNode(this.getDirectives(info.parentType).is['class']);
     const targetUrl = await context.resolver.resolve(
-      classIri,
+      classUri.value,
       new TargetResolverContext(this.ldpClient)
     );
     switch (source.resourceType!) {
-      case ResourceType.DOCUMENT:
+      case ResourceType.CONTAINER: {
+        await this.ldpClient.deleteDocument(new URL(source.getFQSubject()));
+        break;
+      }
+      case ResourceType.DOCUMENT: {
         // Append triples to doc using patch
         await new LdpClient().patchDocument(
-          targetUrl.toString(),
+          targetUrl,
           null,
-          source.documentGraph?.getQuads()
+          source.documentGraph
         );
+        break;
+      }
     }
     return this.mutationHandled(source);
   }
-  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   private async handleUpdateMutation<TArgs>(
     source: IntermediateResult,
@@ -165,20 +190,11 @@ export class MutationHandler {
       source.subject!,
       returnType
     );
-    switch (source.resourceType!) {
-      case ResourceType.DOCUMENT:
-        // Update triples in doc using patch
-        await new LdpClient().patchDocument(
-          targetUrl.toString(),
-          inserts,
-          deletes
-        );
-    }
+    // Update triples in doc using patch
+    await new LdpClient().patchDocument(targetUrl, inserts, deletes);
+
     // Reconstruct object
-    const store = new Store(source.documentGraph?.getQuads());
-    store.removeQuads(deletes);
-    store.addQuads(inserts);
-    source.documentGraph = new Graph(store.getQuads(null, null, null, null));
+    source.documentGraph.remove(...deletes).add(...inserts);
     return this.mutationHandled(source);
   }
 
@@ -189,7 +205,7 @@ export class MutationHandler {
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
     // Grab id of the parent object
-    const parentId = source.subject!;
+    const parentId = namedNode(source.subject!.value);
     const parentClassUri = getDirectives(info.parentType).is.class;
     // Grab the type of the return object
     const returnType = info.schema.getType(
@@ -206,47 +222,33 @@ export class MutationHandler {
     const inputType = info.parentType
       .getFields()
       [info.fieldName]!.args.find((arg) => arg.name === 'input')!.type;
-    const className = this.getDirectives(inputType).is['class'];
+    const classUri = namedNode(this.getDirectives(inputType).is['class']);
 
     // Generate triples for creation (input quads)
     const inserts = this.generateTriplesForInput(
       inputId,
       input,
       utils.unwrapNonNull(inputType) as GraphQLInputObjectType,
-      namedNode(className)
+      classUri
     );
 
-    const originalFieldName = decapitalize(info.fieldName.slice('set'.length));
-    const predicate = this.getDirectives(
-      returnType.getFields()[originalFieldName]!
-    ).property.iri;
-    inserts.push(quad(parentId, namedNode(predicate), inputId));
-    const deletes = source.documentGraph!.find(
-      parentId,
-      namedNode(predicate),
-      null
+    const origField = decapitalize(info.fieldName.slice('set'.length));
+    const predicate = namedNode(
+      this.getDirectives(returnType.getFields()[origField]!).property.iri
     );
+    inserts.push(quad(parentId, predicate, inputId));
+    const deletes = source.documentGraph.find(parentId, predicate, null);
 
-    switch (source.resourceType!) {
-      case ResourceType.DOCUMENT:
-        // Update triples in doc using patch
-        await new LdpClient().patchDocument(
-          targetUrl.toString(),
-          inserts,
-          deletes
-        );
-    }
+    // Update triples in doc using patch
+    await new LdpClient().patchDocument(targetUrl, inserts, deletes);
+
     // Reconstruct object
-    const store = new Store(source.documentGraph!.getQuads());
-    store.removeQuads(deletes);
-    store.addQuads(inserts);
-    source.documentGraph = new Graph(store.getQuads(null, null, null, null));
+    source.documentGraph.remove(...deletes).add(...inserts);
     return this.mutationHandled(source);
   }
 
-  private async handleClearMutation<TArgs>(
+  private async handleClearMutation(
     source: IntermediateResult,
-    args: TArgs,
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
@@ -264,28 +266,16 @@ export class MutationHandler {
 
     // What is the type of the parentField that we have to clear.
     const fieldName = decapitalize(info.fieldName.slice('clear'.length));
-    const predicate = this.getDirectives(returnType.getFields()[fieldName]!)
-      .property['iri'];
-    const deletes = source.documentGraph!.find(
-      parentId,
-      namedNode(predicate),
-      null
+    const predicate = namedNode(
+      this.getDirectives(returnType.getFields()[fieldName]!).property.iri
     );
+    const deletes = source.documentGraph.find(parentId, predicate, null);
 
-    switch (source.resourceType!) {
-      case ResourceType.DOCUMENT:
-        // Update triples in doc using patch
-        await new LdpClient().patchDocument(
-          targetUrl.toString(),
-          null,
-          deletes
-        );
-    }
+    // Update triples in doc using patch
+    await new LdpClient().patchDocument(targetUrl, null, deletes);
 
     // Reconstruct object
-    const store = new Store(source.documentGraph?.getQuads());
-    store.removeQuads(deletes);
-    source.documentGraph = new Graph(store.getQuads(null, null, null, null));
+    source.documentGraph.remove(...deletes);
     return this.mutationHandled(source);
   }
 
@@ -296,7 +286,7 @@ export class MutationHandler {
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
     // Grab id of the parent object
-    const parentId = source.subject!;
+    const parentId = namedNode(source.subject!.value);
     const parentClassUri = getDirectives(info.parentType).is.class;
     // Grab the type of the return object
     const returnType = info.schema.getType(
@@ -313,35 +303,27 @@ export class MutationHandler {
     const inputType = info.parentType
       .getFields()
       [info.fieldName]!.args.find((arg) => arg.name === 'input')!.type;
-    const className = this.getDirectives(inputType).is['class'];
+    const className = namedNode(this.getDirectives(inputType).is.class);
 
     // Generate triples for creation (input quads)
     const inserts = this.generateTriplesForInput(
       inputId,
       input,
       utils.unwrapNonNull(inputType) as GraphQLInputObjectType,
-      namedNode(className)
+      className
     );
 
-    const originalFieldName = decapitalize(info.fieldName.slice('add'.length));
-    const predicate = this.getDirectives(
-      returnType.getFields()[originalFieldName]!
-    ).property.iri;
-    inserts.push(quad(parentId, namedNode(predicate), inputId));
+    const origField = decapitalize(info.fieldName.slice('add'.length));
+    const predicate = namedNode(
+      this.getDirectives(returnType.getFields()[origField]!).property.iri
+    );
+    inserts.push(quad(parentId, predicate, inputId));
 
-    switch (source.resourceType!) {
-      case ResourceType.DOCUMENT:
-        // Update triples in doc using patch
-        await new LdpClient().patchDocument(
-          targetUrl.toString(),
-          inserts,
-          null
-        );
-    }
+    // Update triples in doc using patch
+    await new LdpClient().patchDocument(targetUrl, inserts, null);
+
     // Reconstruct object
-    const store = new Store(source.documentGraph!.getQuads());
-    store.addQuads(inserts);
-    source.documentGraph = new Graph(store.getQuads(null, null, null, null));
+    source.documentGraph.add(...inserts);
     return this.mutationHandled(source);
   }
 
@@ -352,7 +334,7 @@ export class MutationHandler {
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
     // Grab id of the parent object
-    const parentId = source.subject!;
+    const parentId = namedNode(source.subject!.value);
     // Grab the type of the return object
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
@@ -363,32 +345,20 @@ export class MutationHandler {
       new TargetResolverContext(this.ldpClient)
     );
 
-    const id = (args as any).id;
+    const id = namedNode((args as any).id);
 
     // What is the type of the parentField that we have to clear.
     const fieldName = decapitalize(info.fieldName.slice('remove'.length));
-    const predicate = this.getDirectives(returnType.getFields()[fieldName]!)
-      .property['iri'];
-    const deletes = source.documentGraph!.find(
-      parentId,
-      namedNode(predicate),
-      namedNode(id)
+    const predicate = namedNode(
+      this.getDirectives(returnType.getFields()[fieldName]!).property.iri
     );
+    const deletes = source.documentGraph.find(parentId, predicate, id);
 
-    switch (source.resourceType!) {
-      case ResourceType.DOCUMENT:
-        // Update triples in doc using patch
-        await new LdpClient().patchDocument(
-          targetUrl.toString(),
-          null,
-          deletes
-        );
-    }
+    // Update triples in doc using patch
+    await new LdpClient().patchDocument(targetUrl, null, deletes);
 
     // Reconstruct object
-    const store = new Store(source.documentGraph?.getQuads());
-    store.removeQuads(deletes);
-    source.documentGraph = new Graph(store.getQuads(null, null, null, null));
+    source.documentGraph.remove(...deletes);
     return this.mutationHandled(source);
   }
 
@@ -399,7 +369,7 @@ export class MutationHandler {
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
     // Grab id of the parent object
-    const parentId = source.subject!;
+    const parentId = namedNode(source.subject!.value);
     const parentClassUri = getDirectives(info.parentType).is.class;
     // Grab the type of the return object
     const returnType = info.schema.getType(
@@ -409,38 +379,27 @@ export class MutationHandler {
       parentClassUri,
       new TargetResolverContext(this.ldpClient)
     );
-    const id = (args as any).id;
+    const id = namedNode((args as any).id);
 
-    const originalFieldName = decapitalize(info.fieldName.slice('link'.length));
-    const predicate = this.getDirectives(
-      returnType.getFields()[originalFieldName]!
-    ).property.iri;
-    const originalFieldType = returnType.getFields()[originalFieldName]?.type;
+    const origField = decapitalize(info.fieldName.slice('link'.length));
+    const predicate = namedNode(
+      this.getDirectives(returnType.getFields()[origField]!).property.iri
+    );
+    const originalFieldType = returnType.getFields()[origField]?.type;
     const isCollection =
       isListType(originalFieldType) ||
       (isNonNullType(originalFieldType) &&
         isListType(originalFieldType.ofType));
-    const inserts = [quad(parentId, namedNode(predicate), namedNode(id))];
+    const inserts = [quad(parentId, predicate, id)];
     const deletes = isCollection
-      ? null
-      : source.documentGraph!.find(parentId, namedNode(predicate), null);
+      ? []
+      : source.documentGraph.find(parentId, predicate, null);
 
-    switch (source.resourceType!) {
-      case ResourceType.DOCUMENT:
-        // Update triples in doc using patch
-        await new LdpClient().patchDocument(
-          targetUrl.toString(),
-          inserts,
-          deletes
-        );
-    }
+    // Update triples in doc using patch
+    await new LdpClient().patchDocument(targetUrl, inserts, deletes);
+
     // Reconstruct object
-    const store = new Store(source.documentGraph!.getQuads());
-    if (deletes) {
-      store.removeQuads(deletes);
-    }
-    store.addQuads(inserts);
-    source.documentGraph = new Graph(store.getQuads(null, null, null, null));
+    source.documentGraph.remove(...deletes).add(...inserts);
     return this.mutationHandled(source);
   }
 
@@ -451,7 +410,7 @@ export class MutationHandler {
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
     // Grab id of the parent object
-    const parentId = source.subject!;
+    const parentId = namedNode(source.subject!.value);
     // Grab the type of the return object
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
@@ -462,32 +421,20 @@ export class MutationHandler {
       new TargetResolverContext(this.ldpClient)
     );
 
-    const id = (args as any).id;
+    const id = namedNode((args as any).id);
 
     // What is the type of the parentField that we have to clear.
     const fieldName = decapitalize(info.fieldName.slice('unlink'.length));
-    const predicate = this.getDirectives(returnType.getFields()[fieldName]!)
-      .property['iri'];
-    const deletes = source.documentGraph!.find(
-      parentId,
-      namedNode(predicate),
-      namedNode(id)
+    const predicate = namedNode(
+      this.getDirectives(returnType.getFields()[fieldName]!).property.iri
     );
+    const deletes = source.documentGraph.find(parentId, predicate, id);
 
-    switch (source.resourceType!) {
-      case ResourceType.DOCUMENT:
-        // Update triples in doc using patch
-        await new LdpClient().patchDocument(
-          targetUrl.toString(),
-          null,
-          deletes
-        );
-    }
+    // Update triples in doc using patch
+    await new LdpClient().patchDocument(targetUrl, null, deletes);
 
     // Reconstruct object
-    const store = new Store(source.documentGraph?.getQuads());
-    store.removeQuads(deletes);
-    source.documentGraph = new Graph(store.getQuads(null, null, null, null));
+    source.documentGraph.remove(...deletes);
     return this.mutationHandled(source);
   }
 
@@ -548,7 +495,7 @@ export class MutationHandler {
   private generateTriplesForUpdate(
     graph: Graph,
     input: Record<string, any>,
-    subject: NamedNode | BlankNode | Variable,
+    subject: Term,
     objectTypeDefinition: GraphQLObjectType
   ): { inserts: Quad[]; deletes: Quad[] } {
     const inserts: Quad[] = [];
@@ -573,19 +520,21 @@ export class MutationHandler {
         if (isListType(fieldDef.type)) {
           inserts.push(
             ...value.map((v: any) =>
-              quad(subject, namedNode(propertyIri), literal(v))
+              quad(namedNode(subject.value), namedNode(propertyIri), literal(v))
             )
           );
         } else {
-          inserts.push(quad(subject, namedNode(propertyIri), literal(value)));
+          inserts.push(
+            quad(
+              namedNode(subject.value),
+              namedNode(propertyIri),
+              literal(value)
+            )
+          );
         }
       }
     });
     return { inserts, deletes };
-  }
-
-  private TODO() {
-    alert('TODO');
   }
 
   /**
@@ -595,6 +544,27 @@ export class MutationHandler {
    * @returns
    */
   private mutationHandled(source: IntermediateResult): IntermediateResult {
-    return { ...source, mutationHandled: true };
+    source.mutationHandled = true;
+    return source;
+  }
+
+  private getNewDocumentURL(targetUrl: URL, input: Record<string, any>): URL {
+    const id = input[ID_FIELD];
+    const slug = input[SLUG_FIELD];
+    if (id && id.startsWith(targetUrl.toString())) {
+      return new URL(id.endsWith('.ttl') ? id : id + '.ttl');
+    } else if (slug) {
+      return new URL(
+        targetUrl.toString().endsWith('/')
+          ? targetUrl.toString() + `${slug}.ttl`
+          : targetUrl.toString() + `/${slug}.ttl`
+      );
+    } else {
+      return new URL(
+        targetUrl.toString().endsWith('/')
+          ? targetUrl.toString() + `${uuidv4()}.ttl`
+          : targetUrl.toString() + `/${uuidv4()}.ttl`
+      );
+    }
   }
 }

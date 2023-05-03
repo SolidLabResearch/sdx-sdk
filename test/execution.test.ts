@@ -22,6 +22,9 @@ import { Parser, Store, Writer } from 'n3';
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
+const IS_RESOURCE_LINK_HEADER_VAL =
+  '<http://www.w3.org/ns/ldp#Resource>; rel="type"';
+
 const pickDataFile = async () => {
   const files = await readdir('test/assets/data');
   return files.includes('contacts.ttl.patch')
@@ -36,6 +39,16 @@ const resetDataFile = async () => {
     }
   }
 };
+
+mockedAxios.head.mockImplementation(async (uri) => {
+  if (uri === 'http://mock/data' || uri.startsWith('http://mock/data')) {
+    return {
+      headers: {
+        Link: IS_RESOURCE_LINK_HEADER_VAL
+      }
+    };
+  }
+});
 
 mockedAxios.get.mockImplementation(async (uri) => {
   if (uri === 'http://mock/data' || uri.startsWith('http://mock/data')) {
@@ -148,6 +161,7 @@ describe('A GQL Schema can execute', () => {
       createContact,
       { input }
     );
+    console.log(result);
     expect(result).not.toBeUndefined();
     expect(result.data).not.toBeUndefined();
     expect(result.data).toHaveProperty('createContact');
