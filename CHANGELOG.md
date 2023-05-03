@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+- GraphQL query execution support.
+- GraphQL mutation execution support.
+- Support for Document and Container resource types.
+- Tests for GraphQL Schema generation.
+- Tests for GraphQL Schema execution.
+- Tests for SolidLDPContext construction.
+
 ## 1.0.0-beta.5 - 2023-04-13
 ### Added
 - Changelog
