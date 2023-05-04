@@ -45,8 +45,6 @@
     "n3": "^1.16.3",
     "stream-browserify": "^3.0.0",
     "tsyringe": "^4.7.0",
-    "typescript-logging": "^2.1.0",
-    "typescript-logging-category-style": "^2.1.0",
     "uuid": "^9.0.0"
   },
   "devDependencies": {

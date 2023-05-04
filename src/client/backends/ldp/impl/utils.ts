@@ -14,16 +14,7 @@ import {
   isNonNullType,
   isScalarType
 } from 'graphql';
-import {
-  BlankNode,
-  DataFactory,
-  NamedNode,
-  Parser,
-  Quad,
-  Store,
-  Term,
-  Variable
-} from 'n3';
+import { DataFactory, NamedNode, Parser, Quad, Store, Term } from 'n3';
 import { Graph, LdpClient, vocab } from '../../../../commons';
 import { RDFS } from '../../../../commons/vocab';
 

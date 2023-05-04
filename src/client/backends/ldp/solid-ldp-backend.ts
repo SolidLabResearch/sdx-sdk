@@ -2,7 +2,6 @@ import { GraphQLResolveInfo, graphql, isScalarType, print } from 'graphql';
 import { ExecutionResult } from 'graphql/execution/execute';
 import { DocumentNode } from 'graphql/language/ast';
 import { LdpClient, SolidClientCredentials } from '../../../commons';
-import { perfLogger } from '../../../commons/logger';
 import {
   URI_SDX_GENERATE_GRAPHQL_SCHEMA,
   URI_SDX_GENERATE_SHACL_FOLDER
@@ -12,9 +11,7 @@ import { MutationHandler } from './impl/mutation-handler';
 import { QueryHandler } from './impl/query-handler';
 import {
   IntermediateResult,
-  ResourceType,
   getCurrentDirective,
-  getDirectives,
   getRawType
 } from './impl/utils';
 import {
@@ -22,8 +19,6 @@ import {
   TargetResolver,
   TargetResolverContext
 } from './target-resolvers';
-
-const logger = perfLogger;
 
 export class SolidLDPContext implements SolidTargetBackendContext {
   resolver: TargetResolver;

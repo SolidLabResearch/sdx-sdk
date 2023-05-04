@@ -418,7 +418,6 @@ describe('A SchaclReaderService', () => {
 
       it('with correctly paired link fields', async () => {
         types.forEach((type) => {
-          const typeName = type.name.slice(0, -'Mutation'.length);
           const addFields = getFieldsByPrefix(type, 'add');
           const removeFields = getFieldsByPrefix(type, 'remove');
           const setFields = getFieldsByPrefix(type, 'set');
