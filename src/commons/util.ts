@@ -1,5 +1,7 @@
 import {
+  ConstValueNode,
   GraphQLEnumType,
+  GraphQLField,
   GraphQLInputObjectType,
   GraphQLInterfaceType,
   GraphQLObjectType,
@@ -7,12 +9,17 @@ import {
   GraphQLScalarType,
   GraphQLType,
   GraphQLUnionType,
+  Kind,
   isListType,
   isNonNullType,
   isObjectType,
   isScalarType
 } from 'graphql';
-import { GraphQLInputType } from 'graphql/type/definition';
+import {
+  GraphQLInputField,
+  GraphQLInputType,
+  GraphQLNamedType
+} from 'graphql/type/definition';
 import { Quad, Quad_Subject, Store } from 'n3';
 
 export function parseNameFromUri(uriString: string): string {
@@ -93,3 +100,47 @@ export const unwrapNonNull = (
   type: GraphQLType
 ): GraphQLType | GraphQLInputType | GraphQLOutputType =>
   isNonNullType(type) ? type.ofType : type;
+
+/**
+ * Get directives on a GraphQL field via the astNode.
+ * @param fieldOrType The field to get directives from
+ * @returns
+ */
+export const getDirectivesMap = (
+  fieldOrType: GraphQLField<any, any> | GraphQLInputField | GraphQLNamedType
+): Record<string, Record<string, any>> => {
+  if (fieldOrType.astNode && fieldOrType.astNode.directives) {
+    const nodes = fieldOrType.astNode.directives;
+    return nodes.reduce(
+      (acc, dir) => ({
+        ...acc,
+        [dir.name.value]: dir.arguments?.reduce(
+          (prev, arg) => ({
+            ...prev,
+            [arg.name.value]: resolveConstValueNode(arg.value)
+          }),
+          {}
+        )
+      }),
+      {}
+    );
+  }
+  return {};
+};
+
+const resolveConstValueNode = (node: ConstValueNode): any => {
+  if (node.kind === Kind.OBJECT) {
+    return node.fields.reduce(
+      (obj, field) => ({
+        ...obj,
+        [field.name.value]: resolveConstValueNode(field.value)
+      }),
+      {}
+    );
+  } else if (node.kind === Kind.LIST) {
+    return node.values.map((v) => resolveConstValueNode(v));
+  } else if (node.kind === Kind.NULL) {
+    return null;
+  }
+  return node.value;
+};

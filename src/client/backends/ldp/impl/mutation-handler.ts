@@ -1,13 +1,9 @@
 import {
-  GraphQLField,
-  GraphQLInputField,
   GraphQLInputObjectType,
   GraphQLObjectType,
   GraphQLResolveInfo,
-  GraphQLType,
   isListType,
-  isNonNullType,
-  isScalarType
+  isNonNullType
 } from 'graphql';
 import { DataFactory, NamedNode, Quad, Term } from 'n3';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,8 +14,9 @@ import { TargetResolverContext } from '../target-resolvers';
 import {
   IntermediateResult,
   ResourceType,
-  getDirectives,
-  getInstanceById
+  getClassURI,
+  getInstanceById,
+  getPropertyIRI
 } from './utils';
 
 const { literal, namedNode, quad } = DataFactory;
@@ -65,7 +62,7 @@ export class MutationHandler {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
-    const classUri = namedNode(this.getDirectives(info.returnType).is['class']);
+    const classUri = getClassURI(info.returnType);
     const targetUrl = await context.resolver.resolve(
       classUri.value,
       new TargetResolverContext(this.ldpClient)
@@ -121,7 +118,7 @@ export class MutationHandler {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult | undefined> {
-    const classUri = namedNode(getDirectives(info.returnType).is['class']);
+    const classUri = getClassURI(info.returnType);
     const targetUrl = await context.resolver.resolve(
       classUri.value,
       new TargetResolverContext(this.ldpClient)
@@ -146,7 +143,7 @@ export class MutationHandler {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult> {
-    const classUri = namedNode(this.getDirectives(info.parentType).is['class']);
+    const classUri = getClassURI(info.parentType);
     const targetUrl = await context.resolver.resolve(
       classUri.value,
       new TargetResolverContext(this.ldpClient)
@@ -178,9 +175,9 @@ export class MutationHandler {
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
     ) as GraphQLObjectType;
-    const parentClassUri = getDirectives(info.parentType).is.class;
+    const parentClassUri = getClassURI(info.parentType);
     const targetUrl = await context.resolver.resolve(
-      parentClassUri,
+      parentClassUri.value,
       new TargetResolverContext(this.ldpClient)
     );
     const input = (args as any).input;
@@ -206,13 +203,13 @@ export class MutationHandler {
   ): Promise<IntermediateResult> {
     // Grab id of the parent object
     const parentId = namedNode(source.subject!.value);
-    const parentClassUri = getDirectives(info.parentType).is.class;
+    const parentClassUri = getClassURI(info.parentType);
     // Grab the type of the return object
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
     ) as GraphQLObjectType;
     const targetUrl = await context.resolver.resolve(
-      parentClassUri,
+      parentClassUri.value,
       new TargetResolverContext(this.ldpClient)
     );
     const input = (args as any).input;
@@ -222,7 +219,7 @@ export class MutationHandler {
     const inputType = info.parentType
       .getFields()
       [info.fieldName]!.args.find((arg) => arg.name === 'input')!.type;
-    const classUri = namedNode(this.getDirectives(inputType).is['class']);
+    const classUri = getClassURI(inputType);
 
     // Generate triples for creation (input quads)
     const inserts = this.generateTriplesForInput(
@@ -233,9 +230,7 @@ export class MutationHandler {
     );
 
     const origField = decapitalize(info.fieldName.slice('set'.length));
-    const predicate = namedNode(
-      this.getDirectives(returnType.getFields()[origField]!).property.iri
-    );
+    const predicate = getPropertyIRI(returnType.getFields()[origField]!);
     inserts.push(quad(parentId, predicate, inputId));
     const deletes = source.documentGraph.find(parentId, predicate, null);
 
@@ -258,17 +253,15 @@ export class MutationHandler {
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
     ) as GraphQLObjectType;
-    const classUri = this.getDirectives(returnType).is['class'];
+    const classUri = getClassURI(returnType);
     const targetUrl = await context.resolver.resolve(
-      classUri,
+      classUri.value,
       new TargetResolverContext(this.ldpClient)
     );
 
     // What is the type of the parentField that we have to clear.
     const fieldName = decapitalize(info.fieldName.slice('clear'.length));
-    const predicate = namedNode(
-      this.getDirectives(returnType.getFields()[fieldName]!).property.iri
-    );
+    const predicate = getPropertyIRI(returnType.getFields()[fieldName]!);
     const deletes = source.documentGraph.find(parentId, predicate, null);
 
     // Update triples in doc using patch
@@ -287,13 +280,13 @@ export class MutationHandler {
   ): Promise<IntermediateResult> {
     // Grab id of the parent object
     const parentId = namedNode(source.subject!.value);
-    const parentClassUri = getDirectives(info.parentType).is.class;
+    const parentClassUri = getClassURI(info.parentType);
     // Grab the type of the return object
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
     ) as GraphQLObjectType;
     const targetUrl = await context.resolver.resolve(
-      parentClassUri,
+      parentClassUri.value,
       new TargetResolverContext(this.ldpClient)
     );
     const input = (args as any).input;
@@ -303,20 +296,18 @@ export class MutationHandler {
     const inputType = info.parentType
       .getFields()
       [info.fieldName]!.args.find((arg) => arg.name === 'input')!.type;
-    const className = namedNode(this.getDirectives(inputType).is.class);
+    const classUri = getClassURI(inputType);
 
     // Generate triples for creation (input quads)
     const inserts = this.generateTriplesForInput(
       inputId,
       input,
       utils.unwrapNonNull(inputType) as GraphQLInputObjectType,
-      className
+      classUri
     );
 
     const origField = decapitalize(info.fieldName.slice('add'.length));
-    const predicate = namedNode(
-      this.getDirectives(returnType.getFields()[origField]!).property.iri
-    );
+    const predicate = getPropertyIRI(returnType.getFields()[origField]!);
     inserts.push(quad(parentId, predicate, inputId));
 
     // Update triples in doc using patch
@@ -339,9 +330,9 @@ export class MutationHandler {
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
     ) as GraphQLObjectType;
-    const classUri = this.getDirectives(returnType).is['class'];
+    const classUri = getClassURI(returnType);
     const targetUrl = await context.resolver.resolve(
-      classUri,
+      classUri.value,
       new TargetResolverContext(this.ldpClient)
     );
 
@@ -349,9 +340,7 @@ export class MutationHandler {
 
     // What is the type of the parentField that we have to clear.
     const fieldName = decapitalize(info.fieldName.slice('remove'.length));
-    const predicate = namedNode(
-      this.getDirectives(returnType.getFields()[fieldName]!).property.iri
-    );
+    const predicate = getPropertyIRI(returnType.getFields()[fieldName]!);
     const deletes = source.documentGraph.find(parentId, predicate, id);
 
     // Update triples in doc using patch
@@ -370,21 +359,19 @@ export class MutationHandler {
   ): Promise<IntermediateResult> {
     // Grab id of the parent object
     const parentId = namedNode(source.subject!.value);
-    const parentClassUri = getDirectives(info.parentType).is.class;
+    const parentClassUri = getClassURI(info.parentType);
     // Grab the type of the return object
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
     ) as GraphQLObjectType;
     const targetUrl = await context.resolver.resolve(
-      parentClassUri,
+      parentClassUri.value,
       new TargetResolverContext(this.ldpClient)
     );
     const id = namedNode((args as any).id);
 
     const origField = decapitalize(info.fieldName.slice('link'.length));
-    const predicate = namedNode(
-      this.getDirectives(returnType.getFields()[origField]!).property.iri
-    );
+    const predicate = getPropertyIRI(returnType.getFields()[origField]!);
     const originalFieldType = returnType.getFields()[origField]?.type;
     const isCollection =
       isListType(originalFieldType) ||
@@ -415,9 +402,9 @@ export class MutationHandler {
     const returnType = info.schema.getType(
       utils.unwrapNonNull(info.returnType).toString()
     ) as GraphQLObjectType;
-    const classUri = this.getDirectives(returnType).is['class'];
+    const classUri = getClassURI(returnType);
     const targetUrl = await context.resolver.resolve(
-      classUri,
+      classUri.value,
       new TargetResolverContext(this.ldpClient)
     );
 
@@ -425,9 +412,7 @@ export class MutationHandler {
 
     // What is the type of the parentField that we have to clear.
     const fieldName = decapitalize(info.fieldName.slice('unlink'.length));
-    const predicate = namedNode(
-      this.getDirectives(returnType.getFields()[fieldName]!).property.iri
-    );
+    const predicate = getPropertyIRI(returnType.getFields()[fieldName]!);
     const deletes = source.documentGraph.find(parentId, predicate, id);
 
     // Update triples in doc using patch
@@ -436,18 +421,6 @@ export class MutationHandler {
     // Reconstruct object
     source.documentGraph.remove(...deletes);
     return this.mutationHandled(source);
-  }
-
-  private getDirectives(
-    type: GraphQLType | GraphQLField<any, any, any> | GraphQLInputField
-  ): Record<string, any> {
-    if (isListType(type)) {
-      return getDirectives(type.ofType);
-    }
-    if (isNonNullType(type)) {
-      return getDirectives(type.ofType);
-    }
-    return isScalarType(type) ? {} : type.extensions.directives ?? {};
   }
 
   private getNewInstanceID(
@@ -479,14 +452,9 @@ export class MutationHandler {
     return Object.values(inputDefinition.getFields())
       .filter((field) => field.name !== 'slug' && field.name !== 'id')
       .reduce((acc, field) => {
+        const propertyIRI = getPropertyIRI(field);
         if (field.name in input) {
-          acc.push(
-            quad(
-              subject,
-              namedNode(getDirectives(field).property['iri']),
-              literal(input[field.name])
-            )
-          );
+          acc.push(quad(subject, propertyIRI, literal(input[field.name])));
         }
         return acc;
       }, quads);
@@ -503,7 +471,7 @@ export class MutationHandler {
 
     Object.entries(input).forEach(([fieldName, value]) => {
       const fieldDef = objectTypeDefinition.getFields()[fieldName]!;
-      const propertyIri = getDirectives(fieldDef).property['iri'];
+      const propertyIri = getPropertyIRI(fieldDef);
 
       // Throw error if value is null and type was nonnull
       if (value == null) {
@@ -513,23 +481,19 @@ export class MutationHandler {
           );
         }
         // Add quad to deletes, because it was explicitly set to null
-        deletes.push(...graph.find(subject, namedNode(propertyIri), null));
+        deletes.push(...graph.find(subject, propertyIri, null));
       } else {
         // Remove and then insert quads, to perform upgrade
-        deletes.push(...graph.find(subject, namedNode(propertyIri), null));
+        deletes.push(...graph.find(subject, propertyIri, null));
         if (isListType(fieldDef.type)) {
           inserts.push(
             ...value.map((v: any) =>
-              quad(namedNode(subject.value), namedNode(propertyIri), literal(v))
+              quad(namedNode(subject.value), propertyIri, literal(v))
             )
           );
         } else {
           inserts.push(
-            quad(
-              namedNode(subject.value),
-              namedNode(propertyIri),
-              literal(value)
-            )
+            quad(namedNode(subject.value), propertyIri, literal(value))
           );
         }
       }

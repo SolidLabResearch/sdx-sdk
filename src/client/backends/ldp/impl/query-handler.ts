@@ -87,8 +87,6 @@ export class QueryHandler {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<IntermediateResult | IntermediateResult[] | undefined> {
-    // FIXME: temporary set resourcetype
-
     const classUri = getClassURI(info.returnType);
     const targetUrl = await context.resolver.resolve(
       classUri.value,

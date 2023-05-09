@@ -1,11 +1,10 @@
+import { makeExecutableSchema } from '@graphql-tools/schema';
+import { readFile } from 'fs/promises';
 import { GraphQLResolveInfo, graphql, isScalarType, print } from 'graphql';
 import { ExecutionResult } from 'graphql/execution/execute';
 import { DocumentNode } from 'graphql/language/ast';
 import { LdpClient, SolidClientCredentials } from '../../../commons';
-import {
-  URI_SDX_GENERATE_GRAPHQL_SCHEMA,
-  URI_SDX_GENERATE_SHACL_FOLDER
-} from '../../../constants';
+import { URI_SDX_GENERATE_GRAPHQL_SCHEMA } from '../../../constants';
 import { ShaclReaderService } from '../../../parse';
 import { MutationHandler } from './impl/mutation-handler';
 import { QueryHandler } from './impl/query-handler';
@@ -45,21 +44,16 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
   private defaultContext?: SolidLDPContext;
   private queryHandler: QueryHandler;
   private mutationHandler: MutationHandler;
-  // private rootTypes: string[] = [];
-  private parser: ShaclReaderService;
   private ldpClient: LdpClient;
-  private targetResolverContext: TargetResolverContext;
+  // private targetResolverContext: TargetResolverContext;
 
   constructor(options?: SolidLDPBackendOptions) {
-    // TODO: Use schema to parse, instead of SHACL files
-    // Default to generated schema location
     this.schemaFile = options?.schemaFile || URI_SDX_GENERATE_GRAPHQL_SCHEMA;
     this.defaultContext = options?.defaultContext;
     this.ldpClient = new LdpClient(options?.clientCredentials);
-    this.targetResolverContext = new TargetResolverContext(this.ldpClient);
+    // this.targetResolverContext = new TargetResolverContext(this.ldpClient);
     this.queryHandler = new QueryHandler(this.ldpClient);
     this.mutationHandler = new MutationHandler(this.ldpClient);
-    this.parser = new ShaclReaderService();
   }
 
   requester = async <R, V>(
@@ -70,7 +64,8 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     // If no options, try setting a default context as options
     context = context ?? this.defaultContext;
     const query = print(doc);
-    const schema = await this.parser.parseSHACLs(URI_SDX_GENERATE_SHACL_FOLDER);
+    const typeDefs = (await readFile(this.schemaFile)).toString();
+    const schema = makeExecutableSchema({ typeDefs });
     const result = await graphql({
       source: query,
       variableValues: vars!,
@@ -87,22 +82,9 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     context: SolidLDPContext,
     info: GraphQLResolveInfo
   ): Promise<unknown> => {
-    // FIXME: If source is empty, set default
-    // if (!source) {
-    //   source = {
-    //     resourceType: ResourceType.DOCUMENT
-    //   };
-    // }
-
     // IF Directive @identifier is present
     const directive = getCurrentDirective(info);
     if ('identifier' in directive) {
-      // const parentClassUri = getDirectives(info.parentType).is.class;
-      // const targetUrl = await context.resolver.resolve(
-      //   parentClassUri,
-      //   this.targetResolverContext
-      // );
-      // source.requestURL = targetUrl;
       return this.queryHandler.handleIdProperty(source);
     } else if ('property' in directive) {
       // IF Directive @property is present
