@@ -5,7 +5,6 @@ import { ExecutionResult } from 'graphql/execution/execute';
 import { DocumentNode } from 'graphql/language/ast';
 import { LdpClient, SolidClientCredentials } from '../../../commons';
 import { URI_SDX_GENERATE_GRAPHQL_SCHEMA } from '../../../constants';
-import { ShaclReaderService } from '../../../parse';
 import { MutationHandler } from './impl/mutation-handler';
 import { QueryHandler } from './impl/query-handler';
 import {
@@ -13,11 +12,7 @@ import {
   getCurrentDirective,
   getRawType
 } from './impl/utils';
-import {
-  StaticTargetResolver,
-  TargetResolver,
-  TargetResolverContext
-} from './target-resolvers';
+import { StaticTargetResolver, TargetResolver } from './target-resolvers';
 
 export class SolidLDPContext implements SolidTargetBackendContext {
   resolver: TargetResolver;
@@ -45,13 +40,11 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
   private queryHandler: QueryHandler;
   private mutationHandler: MutationHandler;
   private ldpClient: LdpClient;
-  // private targetResolverContext: TargetResolverContext;
 
   constructor(options?: SolidLDPBackendOptions) {
     this.schemaFile = options?.schemaFile || URI_SDX_GENERATE_GRAPHQL_SCHEMA;
     this.defaultContext = options?.defaultContext;
     this.ldpClient = new LdpClient(options?.clientCredentials);
-    // this.targetResolverContext = new TargetResolverContext(this.ldpClient);
     this.queryHandler = new QueryHandler(this.ldpClient);
     this.mutationHandler = new MutationHandler(this.ldpClient);
   }

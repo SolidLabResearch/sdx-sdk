@@ -55,13 +55,6 @@ mockedAxios.get.mockImplementation(async (uri) => {
     const data = await pickDataFile();
     return { data: data.toString() };
   }
-
-  if (uri.endsWith('/index.json')) {
-    return { data: { entries: ['oneHash'] } };
-  } else {
-    const shacl = await readFile('test/assets/shacl/contacts_shacl.ttl');
-    return { data: shacl.toString() };
-  }
 });
 
 mockedAxios.patch.mockImplementation(async (url, data) => {
@@ -89,7 +82,7 @@ mockedAxios.patch.mockImplementation(async (url, data) => {
   });
 });
 
-describe('A GQL Schema can execute', () => {
+describe('GQL Schema executes', () => {
   const context = new SolidLDPContext('http://mock/data');
   const ldpBackend = new SolidLDPBackend({
     schemaFile: 'test/assets/gql/schema.graphqls',
@@ -111,7 +104,6 @@ describe('A GQL Schema can execute', () => {
     expect(result).not.toBeUndefined();
     expect(result.data).not.toBeUndefined();
     expect(result.data).toHaveProperty('contact');
-    console.log(result);
     const contact = (result.data! as any).contact;
     expect(contact).toMatchObject({
       id: 'http://example.org/cont/tdupont',
