@@ -1,8 +1,9 @@
-import axios, {
-  AxiosResponse,
-  AxiosResponseHeaders,
-  RawAxiosResponseHeaders
-} from 'axios';
+import {
+  KeyPair,
+  buildAuthenticatedFetch,
+  createDpopHeader,
+  generateDpopKeyPair
+} from '@inrupt/solid-client-authn-core';
 import { DataFactory, Parser, Quad, Writer } from 'n3';
 import { ResourceType } from '../../client/backends/ldp/impl/utils';
 import { SolidClientCredentials } from '../auth/solid-client-credentials';
@@ -20,16 +21,69 @@ const IS_RESOURCE_LINK_HEADER_VAL =
 
 export class LdpClient {
   private clientCredentials?: SolidClientCredentials;
+  private authFetch?: typeof fetch;
+  private dpopKey?: KeyPair;
 
   constructor(clientCredentials?: SolidClientCredentials) {
     this.clientCredentials = clientCredentials;
+    if (clientCredentials) {
+      this.getDPoPKey();
+    }
+  }
+
+  private async getDPoPKey(): Promise<KeyPair> {
+    if (!this.dpopKey) {
+      this.dpopKey = await generateDpopKeyPair();
+    }
+    return this.dpopKey;
+  }
+
+  private async getAccessToken(): Promise<string> {
+    const {
+      clientId,
+      clientSecret: clientSercret,
+      identityServerUrl
+    } = this.clientCredentials!;
+    const dpopKey = await this.getDPoPKey();
+    const authString = `${encodeURIComponent(clientId)}:${encodeURIComponent(
+      clientSercret
+    )}`;
+    const wellKnownUrl = `${identityServerUrl}/.well-known/openid-configuration`;
+    const token_endpoint = await fetch(wellKnownUrl)
+      .then((res) => res.json())
+      .then((json) => json.token_endpoint);
+    const response = await fetch(token_endpoint, {
+      method: 'POST',
+      body: 'grant_type=client_credentials&scope=webid',
+
+      headers: {
+        Authorization: `Basic ${Buffer.from(authString).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        dpop: await createDpopHeader(token_endpoint, 'POST', dpopKey)
+      }
+    });
+    const json = await response.json();
+    return json.access_token;
+  }
+
+  async getAuthFetch(): Promise<typeof fetch> {
+    if (!this.authFetch && this.clientCredentials) {
+      this.authFetch = await buildAuthenticatedFetch(
+        fetch,
+        await this.getAccessToken(),
+        {
+          dpopKey: await this.getDPoPKey()
+        }
+      );
+    }
+    return this.clientCredentials ? this.authFetch! : fetch;
   }
 
   async patchDocument(
     url: URL,
     inserts: Quad[] | Graph | null = null,
     deletes: Quad[] | Graph | null = null
-  ): Promise<AxiosResponse> {
+  ): Promise<Response> {
     inserts = inserts && !Array.isArray(inserts) ? inserts.getQuads() : inserts;
     deletes = deletes && !Array.isArray(deletes) ? deletes.getQuads() : deletes;
     const insertsWriter = new Writer({
@@ -60,51 +114,64 @@ export class LdpClient {
       [n3Inserts, n3Deletes].filter((item) => item != null).join(';') + '.';
     const requestBody = `@prefix solid: <http://www.w3.org/ns/solid/terms#>.\n_:rename a solid:InsertDeletePatch;\n${patchContent}`;
 
-    const resp = await axios.patch(url.toString(), requestBody, {
-      headers: {
-        'Content-Type': 'text/n3'
-      }
+    const authFetch = await this.getAuthFetch();
+    const resp = await authFetch(url.toString(), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'text/n3' },
+      body: requestBody
     });
 
     if (resp.status < 200 || resp.status > 399) {
       throw new Error(
-        `The patch was not completed successfully (status: ${resp.status}, message: ${resp.data})`
+        `The patch was not completed successfully (status: ${
+          resp.status
+        }, message: ${await resp.text()})`
       );
     }
     return resp;
   }
 
-  async putDocument(location: URL, content: Graph): Promise<AxiosResponse> {
+  async putDocument(location: URL, content: Graph): Promise<Response> {
     let body;
     const writer = new Writer({ format: 'Turtle' });
     writer.addQuads(content.getQuads());
     writer.end(async (_, result) => (body = result));
-    const resp = await axios.put(location.toString(), body, {
-      headers: {
-        'Content-Type': CONTENT_TYPE_TURTLE
-      }
+    const authFetch = await this.getAuthFetch();
+    const resp = await authFetch(location.toString(), {
+      method: 'PUT',
+      headers: { 'Content-Type': CONTENT_TYPE_TURTLE },
+      body
     });
     if (resp.status < 200 || resp.status > 399) {
       throw new Error(
-        `The PUT was not completed successfully (status: ${resp.status}, message: ${resp.data})`
+        `The PUT was not completed successfully (status: ${
+          resp.status
+        }, message: ${await resp.text()})`
       );
     }
     return resp;
   }
 
-  async deleteDocument(location: URL): Promise<AxiosResponse> {
-    const resp = await axios.delete(location.toString());
+  async deleteDocument(location: URL): Promise<Response> {
+    const authFetch = await this.getAuthFetch();
+    const resp = await authFetch(location.toString(), { method: 'DELETE' });
     if (resp.status < 200 || resp.status > 399) {
       throw new Error(
-        `The DELETE was not completed successfully (status: ${resp.status}, message: ${resp.data})`
+        `The DELETE was not completed successfully (status: ${
+          resp.status
+        }, message: ${await resp.text()})`
       );
     }
     return resp;
   }
 
   async fetchResourceType(location: URL): Promise<ResourceType> {
-    const resp = await axios.head(location.toString());
-    const linkHeaderValue = getHeader(resp.headers, LINK_HEADER);
+    const authFetch = await this.getAuthFetch();
+    const resp = await authFetch(location.toString(), {
+      method: 'HEAD'
+    });
+    // const linkHeaderValue = getHeader(resp.headers, LINK_HEADER);
+    const linkHeaderValue = resp.headers.get(LINK_HEADER)?.split(',');
     if ((linkHeaderValue as string[]).includes(IS_CONTAINER_LINK_HEADER_VAL)) {
       return ResourceType.CONTAINER;
     } else if (
@@ -119,15 +186,21 @@ export class LdpClient {
   }
 
   async downloadDocumentGraph(location: URL): Promise<Graph> {
-    const doc = await axios.get(location.toString());
-    return new Graph(new Parser().parse(doc.data));
+    const authFetch = await this.getAuthFetch();
+    const doc = await authFetch(location.toString());
+    const txt = await doc.text();
+    return new Graph(new Parser().parse(txt));
   }
 
   async downloadContainerAsGraph(location: URL): Promise<Graph> {
-    const containerResp = await axios.get(location.toString(), {
-      headers: { Accept: CONTENT_TYPE_TURTLE }
+    const authFetch = await this.getAuthFetch();
+    const containerResp = await authFetch(location.toString(), {
+      headers: {
+        Accept: CONTENT_TYPE_TURTLE
+      }
     });
-    const containerIndex = new Graph(new Parser().parse(containerResp.data));
+    const txt = await containerResp.text();
+    const containerIndex = new Graph(new Parser().parse(txt));
     const resultGraph = new Graph();
     containerIndex.find(null, LDP_CONTAINS, null).map(async (child) => {
       const subGraph = await this.downloadDocumentGraph(
@@ -136,20 +209,5 @@ export class LdpClient {
       resultGraph.addGraph(subGraph);
     });
     return resultGraph;
-  }
-}
-
-function getHeader(
-  response: RawAxiosResponseHeaders,
-  headerName: string
-): string[] {
-  headerName = headerName.toLowerCase();
-  const ucHeaderName =
-    headerName.slice(0, 1).toUpperCase() + headerName.slice(1);
-  const headerValue = response[headerName] ?? response[ucHeaderName] ?? [];
-  if (Array.isArray(headerValue)) {
-    return headerValue;
-  } else {
-    return [headerValue.toString()];
   }
 }
