@@ -3,10 +3,7 @@ import { GraphQLResolveInfo, graphql, isScalarType, print } from 'graphql';
 import { ExecutionResult } from 'graphql/execution/execute';
 import { DocumentNode } from 'graphql/language/ast';
 import { LdpClient, SolidClientCredentials } from '../../../commons';
-import {
-  URI_SDX_GENERATE_GRAPHQL_SCHEMA,
-  URI_SDX_GENERATE_SDK
-} from '../../../constants';
+import { URI_SDX_GENERATE_SDK_DYNAMIC_IMPORT_PATH } from '../../../constants';
 import { MutationHandler } from './impl/mutation-handler';
 import { QueryHandler } from './impl/query-handler';
 import {
@@ -62,7 +59,11 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
       let typeDefs;
       if (!this.schema) {
         // Dynamic import of schema
-        const generatedSdkFile = await import(URI_SDX_GENERATE_SDK);
+        console.log(URI_SDX_GENERATE_SDK_DYNAMIC_IMPORT_PATH);
+        const generatedSdkFile = await import(
+          URI_SDX_GENERATE_SDK_DYNAMIC_IMPORT_PATH
+        );
+        console.log(generatedSdkFile);
         typeDefs = generatedSdkFile['GRAPHQL_SCHEMA'];
       } else {
         typeDefs = this.schema;
@@ -77,8 +78,13 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
         fieldResolver: this.fieldResolver
       });
       return result as ExecutionResult<R>;
-    } catch {
-      throw new Error('No GRAPHQL_SCHEMA variable found in generated SDK file');
+    } catch (err: any) {
+      throw new Error(
+        'No GRAPHQL_SCHEMA variable found in generated SDK file\n' +
+          err.message +
+          '\n' +
+          err.stack
+      );
     }
   };
 

@@ -100,9 +100,14 @@ export class LdpClient {
 
   async fetchResourceType(location: URL): Promise<ResourceType> {
     const resp = await axios.head(location.toString());
+    console.log(resp.headers);
 
     // Get type using link header
-    const linkHeaderValue = resp.headers[LINK_HEADER] ?? [];
+    const linkHeaderValue =
+      resp.headers[LINK_HEADER] ??
+      resp.headers[LINK_HEADER.toLowerCase()] ??
+      [];
+    console.log(linkHeaderValue);
     if (
       linkHeaderValue === IS_CONTAINER_LINK_HEADER_VAL ||
       (linkHeaderValue as string[]).includes(IS_CONTAINER_LINK_HEADER_VAL)
