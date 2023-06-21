@@ -18,6 +18,7 @@ import {
 } from './assets/gql/my-queries';
 import { readFile, readdir, rm, writeFile } from 'fs/promises';
 import { Parser, Store, Writer } from 'n3';
+import { readFileSync } from 'fs';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -84,8 +85,12 @@ mockedAxios.patch.mockImplementation(async (url, data) => {
 
 describe('GQL Schema executes', () => {
   const context = new SolidLDPContext('http://mock/data');
+  const schema = readFileSync(
+    'test/assets/gql/schema.graphqls',
+    'utf-8'
+  ).toString();
   const ldpBackend = new SolidLDPBackend({
-    schemaFile: 'test/assets/gql/schema.graphqls',
+    schema,
     defaultContext: context
   });
 

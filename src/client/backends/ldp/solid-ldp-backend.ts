@@ -31,20 +31,20 @@ export class SolidLDPContext implements SolidTargetBackendContext {
 }
 
 export interface SolidLDPBackendOptions {
-  schemaFile?: string;
+  schema?: string;
   clientCredentials?: SolidClientCredentials;
   defaultContext?: SolidLDPContext;
 }
 
 export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
-  private schemaFile: string;
+  private schema?: string;
   private defaultContext?: SolidLDPContext;
   private queryHandler: QueryHandler;
   private mutationHandler: MutationHandler;
   private ldpClient: LdpClient;
 
   constructor(options?: SolidLDPBackendOptions) {
-    this.schemaFile = options?.schemaFile || URI_SDX_GENERATE_GRAPHQL_SCHEMA;
+    this.schema = options?.schema;
     this.defaultContext = options?.defaultContext;
     this.ldpClient = new LdpClient(options?.clientCredentials);
     this.queryHandler = new QueryHandler(this.ldpClient);
@@ -58,13 +58,16 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
   ): Promise<ExecutionResult<R>> => {
     // If no options, try setting a default context as options
     context = context ?? this.defaultContext;
-    const query = print(doc);
-    // const typeDefs = (await readFile(this.schemaFile)).toString();
-
-    // Dynamic import of schema
     try {
-      const generatedSdkFile = await import(URI_SDX_GENERATE_SDK);
-      const typeDefs = generatedSdkFile['GRAPHQL_SCHEMA'];
+      let typeDefs;
+      if (!this.schema) {
+        // Dynamic import of schema
+        const generatedSdkFile = await import(URI_SDX_GENERATE_SDK);
+        typeDefs = generatedSdkFile['GRAPHQL_SCHEMA'];
+      } else {
+        typeDefs = this.schema;
+      }
+      const query = print(doc);
       const schema = makeExecutableSchema({ typeDefs });
       const result = await graphql({
         source: query,
