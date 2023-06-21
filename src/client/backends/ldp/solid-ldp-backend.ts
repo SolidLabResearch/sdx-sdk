@@ -1,10 +1,12 @@
 import { makeExecutableSchema } from '@graphql-tools/schema';
-import { readFile } from 'fs/promises';
 import { GraphQLResolveInfo, graphql, isScalarType, print } from 'graphql';
 import { ExecutionResult } from 'graphql/execution/execute';
 import { DocumentNode } from 'graphql/language/ast';
 import { LdpClient, SolidClientCredentials } from '../../../commons';
-import { URI_SDX_GENERATE_GRAPHQL_SCHEMA } from '../../../constants';
+import {
+  URI_SDX_GENERATE_GRAPHQL_SCHEMA,
+  URI_SDX_GENERATE_SDK
+} from '../../../constants';
 import { MutationHandler } from './impl/mutation-handler';
 import { QueryHandler } from './impl/query-handler';
 import {
@@ -57,16 +59,24 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     // If no options, try setting a default context as options
     context = context ?? this.defaultContext;
     const query = print(doc);
-    const typeDefs = (await readFile(this.schemaFile)).toString();
-    const schema = makeExecutableSchema({ typeDefs });
-    const result = await graphql({
-      source: query,
-      variableValues: vars!,
-      schema,
-      contextValue: context,
-      fieldResolver: this.fieldResolver
-    });
-    return result as ExecutionResult<R>;
+    // const typeDefs = (await readFile(this.schemaFile)).toString();
+
+    // Dynamic import of schema
+    try {
+      const generatedSdkFile = await import(URI_SDX_GENERATE_SDK);
+      const typeDefs = generatedSdkFile['GRAPHQL_SCHEMA'];
+      const schema = makeExecutableSchema({ typeDefs });
+      const result = await graphql({
+        source: query,
+        variableValues: vars!,
+        schema,
+        contextValue: context,
+        fieldResolver: this.fieldResolver
+      });
+      return result as ExecutionResult<R>;
+    } catch {
+      throw new Error('No GRAPHQL_SCHEMA variable found in generated SDK file');
+    }
   };
 
   private fieldResolver = async <TArgs>(
