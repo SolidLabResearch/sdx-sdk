@@ -59,11 +59,9 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
       let typeDefs;
       if (!this.schema) {
         // Dynamic import of schema
-        console.log(URI_SDX_GENERATE_SDK_DYNAMIC_IMPORT_PATH);
         const generatedSdkFile = await import(
           URI_SDX_GENERATE_SDK_DYNAMIC_IMPORT_PATH
         );
-        console.log(generatedSdkFile);
         typeDefs = generatedSdkFile['GRAPHQL_SCHEMA'];
       } else {
         typeDefs = this.schema;

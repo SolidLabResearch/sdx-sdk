@@ -159,7 +159,6 @@ describe('GQL Schema executes', () => {
       createContact,
       { input }
     );
-    console.log(result);
     expect(result).not.toBeUndefined();
     expect(result.data).not.toBeUndefined();
     expect(result.data).toHaveProperty('createContact');

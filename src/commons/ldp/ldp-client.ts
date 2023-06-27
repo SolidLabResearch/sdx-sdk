@@ -1,14 +1,18 @@
-import axios, { AxiosResponse } from 'axios';
+import axios, {
+  AxiosResponse,
+  AxiosResponseHeaders,
+  RawAxiosResponseHeaders
+} from 'axios';
 import { DataFactory, Parser, Quad, Writer } from 'n3';
+import { ResourceType } from '../../client/backends/ldp/impl/utils';
 import { SolidClientCredentials } from '../auth/solid-client-credentials';
 import { Graph } from '../graph';
-import { ResourceType } from '../../client/backends/ldp/impl/utils';
 
 const { namedNode } = DataFactory;
 
 const CONTENT_TYPE_TURTLE = 'text/turtle';
 const LDP_CONTAINS = namedNode('http://www.w3.org/ns/ldp#contains');
-const LINK_HEADER = 'Link';
+const LINK_HEADER = 'link';
 const IS_CONTAINER_LINK_HEADER_VAL =
   '<http://www.w3.org/ns/ldp#Container>; rel="type"';
 const IS_RESOURCE_LINK_HEADER_VAL =
@@ -100,21 +104,10 @@ export class LdpClient {
 
   async fetchResourceType(location: URL): Promise<ResourceType> {
     const resp = await axios.head(location.toString());
-    console.log(resp.headers);
-
-    // Get type using link header
-    const linkHeaderValue =
-      resp.headers[LINK_HEADER] ??
-      resp.headers[LINK_HEADER.toLowerCase()] ??
-      [];
-    console.log(linkHeaderValue);
-    if (
-      linkHeaderValue === IS_CONTAINER_LINK_HEADER_VAL ||
-      (linkHeaderValue as string[]).includes(IS_CONTAINER_LINK_HEADER_VAL)
-    ) {
+    const linkHeaderValue = getHeader(resp.headers, LINK_HEADER);
+    if ((linkHeaderValue as string[]).includes(IS_CONTAINER_LINK_HEADER_VAL)) {
       return ResourceType.CONTAINER;
     } else if (
-      linkHeaderValue === IS_RESOURCE_LINK_HEADER_VAL ||
       (linkHeaderValue as string[]).includes(IS_RESOURCE_LINK_HEADER_VAL)
     ) {
       return ResourceType.DOCUMENT;
@@ -143,5 +136,20 @@ export class LdpClient {
       resultGraph.addGraph(subGraph);
     });
     return resultGraph;
+  }
+}
+
+function getHeader(
+  response: RawAxiosResponseHeaders,
+  headerName: string
+): string[] {
+  headerName = headerName.toLowerCase();
+  const ucHeaderName =
+    headerName.slice(0, 1).toUpperCase() + headerName.slice(1);
+  const headerValue = response[headerName] ?? response[ucHeaderName] ?? [];
+  if (Array.isArray(headerValue)) {
+    return headerValue;
+  } else {
+    return [headerValue.toString()];
   }
 }
