@@ -117,8 +117,6 @@ describe('GQL Schema executes', () => {
     expect(result).not.toBeUndefined();
     expect(result.data).not.toBeUndefined();
     expect(result.data).toHaveProperty('contact');
-    console.log('RESULTS', JSON.stringify(result, null, 2));
-    console.log('DATA', JSON.stringify(result.data, null, 2));
     const contact = (result.data! as any).contact;
     expect(contact).toMatchObject({
       id: 'http://example.org/cont/tdupont',

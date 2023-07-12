@@ -1,7 +1,8 @@
+import { readFileSync } from 'fs';
 import gql from 'graphql-tag';
 import { SolidLDPBackend, SolidLDPContext, StaticTargetResolver } from '../src';
-import { LdpClient, SolidClientCredentials } from '../src/commons';
-import { readFileSync } from 'fs';
+import { SolidClientCredentials } from '../src/commons';
+import { describeIf } from './util/utils';
 
 describe('SolidLDPContext', () => {
   it('can take a string as argument', () => {
@@ -26,8 +27,8 @@ describe('StaticTargetResolver', () => {
   });
 });
 
-describe('Auth test', () => {
-  it('works', async () => {
+describeIf('docker')('Auth', () => {
+  it('supports client credentials', async () => {
     const schema = readFileSync(
       'test/assets/gql/schema.graphqls',
       'utf-8'
@@ -39,13 +40,12 @@ describe('Auth test', () => {
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        email: 'thomasdupont100@gmail.com',
+        email: 'test@test.com',
         password: 'test',
         name: 'my-token'
       })
     });
     const { id, secret } = await response.json();
-    // console.log(id, secret);
 
     // step 2: requesting access token
     const clientCredentials: SolidClientCredentials = {
@@ -55,7 +55,7 @@ describe('Auth test', () => {
     };
 
     const context = new SolidLDPContext(
-      'http://localhost:3000/mypod/complex.ttl'
+      'http://localhost:3000/my-pod/contacts.ttl'
     );
     const backend = new SolidLDPBackend({
       clientCredentials,
@@ -83,12 +83,8 @@ describe('Auth test', () => {
         givenName: 'Thomas'
       },
       {
-        familyName: 'Piet',
-        givenName: 'Demeester'
-      },
-      {
-        familyName: 'Doe',
-        givenName: 'John'
+        familyName: 'Demeester',
+        givenName: 'Piet'
       }
     ]);
   });
