@@ -20,21 +20,20 @@ jobs:
           node-version: '18.x'
       - run: npm ci --ignore-scripts
       - run: npm run lint
-  
-  test:
+
+  test-linux:
     needs: lint
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
         operating-system:
           - ubuntu-latest
-          - windows-latest
         node-version:
           - '18.0'
           - '18.x'
           - '19.x'
     env:
-      TEST_DOCKER: ${{ matrix.operating-system == 'ubuntu-latest' }}
+      TEST_DOCKER: true
     services:
       authed-css:
         image: ghcr.io/solidlabresearch/css-test-auth:latest
@@ -54,9 +53,39 @@ jobs:
         run: npm ci
       - name: Run unit tests
         run: npm run test
+  
+  test-windows:
+    needs: lint
+    runs-on: ${{ matrix.operating-system }}
+    strategy:
+      matrix:
+        operating-system:
+          - windows-latest
+        node-version:
+          - '18.0'
+          - '18.x'
+          - '19.x'
+    env:
+      TEST_DOCKER: false
+    timeout-minutes: 10
+    steps:
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Ensure line endings are consistent
+        run: git config --global core.autocrlf input
+      - name: Check out repository
+        uses: actions/checkout@v3.5.1
+      - name: Install dependencies and run build scripts
+        run: npm ci
+      - name: Run unit tests
+        run: npm run test
 
   build:
-    needs: test
+    needs: 
+      - test-linux
+      - test-windows
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3.5.1
