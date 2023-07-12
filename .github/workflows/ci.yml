@@ -33,6 +33,13 @@ jobs:
           - '18.0'
           - '18.x'
           - '19.x'
+    env:
+      TEST_DOCKER: true
+    services:
+      authed-css:
+        image: ghcr.io/solidlabresearch/css-test-auth:latest
+        ports:
+          - 3000:3000
     timeout-minutes: 10
     steps:
       - name: Use Node.js ${{ matrix.node-version }}

@@ -1,5 +1,6 @@
-import axios from 'axios';
-
+import { readFileSync } from 'fs';
+import { readFile, readdir, rm, writeFile } from 'fs/promises';
+import { Parser, Store, Writer } from 'n3';
 import { SolidLDPBackend, SolidLDPContext } from '../src';
 import {
   addWorksFor,
@@ -16,12 +17,6 @@ import {
   unlinkClearAddress,
   unlinkRemoveWorksFor
 } from './assets/gql/my-queries';
-import { readFile, readdir, rm, writeFile } from 'fs/promises';
-import { Parser, Store, Writer } from 'n3';
-import { readFileSync } from 'fs';
-
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 const IS_RESOURCE_LINK_HEADER_VAL =
   '<http://www.w3.org/ns/ldp#Resource>; rel="type"';
@@ -41,47 +36,60 @@ const resetDataFile = async () => {
   }
 };
 
-mockedAxios.head.mockImplementation(async (uri) => {
-  if (uri === 'http://mock/data' || uri.startsWith('http://mock/data')) {
-    return {
-      headers: {
-        Link: IS_RESOURCE_LINK_HEADER_VAL
-      }
-    };
-  }
-});
+jest.spyOn(global, 'fetch').mockImplementation(
+  jest.fn(async (uri: RequestInfo | URL, init?: RequestInit | undefined) => {
+    switch (init?.method) {
+      case 'HEAD':
+        if (
+          uri === 'http://mock/data' ||
+          uri.toString().startsWith('http://mock/data')
+        ) {
+          const headers = new Headers({ Link: IS_RESOURCE_LINK_HEADER_VAL });
+          return {
+            headers
+          };
+        }
+        break;
+      case 'PATCH':
+        {
+          const data = init.body;
+          const contacts_data = await pickDataFile();
+          const quads = new Parser({ format: 'text/turtle' }).parse(
+            contacts_data.toString()
+          );
+          const store = new Store(quads);
+          const { inserts, deletes } = parseInsertsDeletes(data as string);
 
-mockedAxios.get.mockImplementation(async (uri) => {
-  if (uri === 'http://mock/data' || uri.startsWith('http://mock/data')) {
-    const data = await pickDataFile();
-    return { data: data.toString() };
-  }
-});
+          store.removeQuads(deletes);
+          store.addQuads(inserts);
+          const writer = new Writer({ format: 'text/turtle' });
 
-mockedAxios.patch.mockImplementation(async (url, data) => {
-  const contacts_data = await pickDataFile();
-  const quads = new Parser({ format: 'text/turtle' }).parse(
-    contacts_data.toString()
-  );
-  const store = new Store(quads);
-  const { inserts, deletes } = parseInsertsDeletes(data as string);
-
-  store.removeQuads(deletes);
-  store.addQuads(inserts);
-  const writer = new Writer({ format: 'text/turtle' });
-
-  writer.addQuads(store.getQuads(null, null, null, null));
-  return new Promise((resolve) => {
-    writer.end((error, res) => {
-      writeFile('test/assets/data/contacts.ttl.patch', res).then(() => {
-        resolve({
-          status: 201,
-          statusText: 'Created'
-        });
-      });
-    });
-  });
-});
+          writer.addQuads(store.getQuads(null, null, null, null));
+          return new Promise((resolve) => {
+            writer.end((error, res) => {
+              writeFile('test/assets/data/contacts.ttl.patch', res).then(() => {
+                resolve({
+                  status: 201,
+                  statusText: 'Created'
+                });
+              });
+            });
+          });
+        }
+        break;
+      default:
+      case 'GET':
+        if (
+          uri === 'http://mock/data' ||
+          uri.toString().startsWith('http://mock/data')
+        ) {
+          const data = await pickDataFile();
+          return new Response(data.toString());
+        }
+        break;
+    }
+  }) as jest.Mock
+);
 
 describe('GQL Schema executes', () => {
   const context = new SolidLDPContext('http://mock/data');
