@@ -34,7 +34,7 @@ jobs:
           - '18.x'
           - '19.x'
     env:
-      TEST_DOCKER: true
+      TEST_DOCKER: ${{ matrix.operating-system == 'ubuntu-latest' }}
     services:
       authed-css:
         image: ghcr.io/solidlabresearch/css-test-auth:latest
