@@ -8,6 +8,7 @@ import { DataFactory, Parser, Quad, Writer } from 'n3';
 import { ResourceType } from '../../client/backends/ldp/impl/utils';
 import { SolidClientCredentials } from '../auth/solid-client-credentials';
 import { Graph } from '../graph';
+import { Base64 } from 'js-base64';
 
 const { namedNode } = DataFactory;
 
@@ -57,7 +58,8 @@ export class LdpClient {
       body: 'grant_type=client_credentials&scope=webid',
 
       headers: {
-        Authorization: `Basic ${Buffer.from(authString).toString('base64')}`,
+        //TODO: use JSbase64
+        Authorization: `Basic ${Base64.encode(authString)}`,
         'Content-Type': 'application/x-www-form-urlencoded',
         dpop: await createDpopHeader(token_endpoint, 'POST', dpopKey)
       }
