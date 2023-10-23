@@ -51,8 +51,8 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     this.mutationHandler = new MutationHandler(this.ldpClient);
   }
 
-  private dynImport = (path: string) => {
-    return import(path);
+  private dynImport = async (path: string) => {
+    return (await fetch(path)).text();
   };
 
   requester = async <R, V>(
@@ -69,7 +69,8 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
         const generatedSdkFile = await this.dynImport(this.schemaPath!);
         console.log(URI_SDX_GENERATE_SDK_DYNAMIC_IMPORT_PATH);
         console.log(generatedSdkFile);
-        typeDefs = generatedSdkFile['GRAPHQL_SCHEMA'];
+        // typeDefs = generatedSdkFile['GRAPHQL_SCHEMA'];
+        typeDefs = generatedSdkFile;
       } else {
         typeDefs = this.schema;
       }
