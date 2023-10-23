@@ -3,7 +3,6 @@ import { GraphQLResolveInfo, graphql, isScalarType, print } from 'graphql';
 import { ExecutionResult } from 'graphql/execution/execute';
 import { DocumentNode } from 'graphql/language/ast';
 import { LdpClient, SolidClientCredentials } from '../../../commons';
-import { URI_SDX_GENERATE_SDK_DYNAMIC_IMPORT_PATH } from '../../../constants';
 import { MutationHandler } from './impl/mutation-handler';
 import { QueryHandler } from './impl/query-handler';
 import {
@@ -29,14 +28,14 @@ export class SolidLDPContext implements SolidTargetBackendContext {
 
 export interface SolidLDPBackendOptions {
   schema?: string;
-  schemaPath?: string;
+  schemaAssetPath?: string;
   clientCredentials?: SolidClientCredentials;
   defaultContext?: SolidLDPContext;
 }
 
 export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
   private schema?: string;
-  private schemaPath?: string;
+  private schemaAssetPath?: string;
   private defaultContext?: SolidLDPContext;
   private queryHandler: QueryHandler;
   private mutationHandler: MutationHandler;
@@ -44,16 +43,12 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
 
   constructor(options?: SolidLDPBackendOptions) {
     this.schema = options?.schema;
-    this.schemaPath = options?.schemaPath;
+    this.schemaAssetPath = options?.schemaAssetPath;
     this.defaultContext = options?.defaultContext;
     this.ldpClient = new LdpClient(options?.clientCredentials);
     this.queryHandler = new QueryHandler(this.ldpClient);
     this.mutationHandler = new MutationHandler(this.ldpClient);
   }
-
-  private dynImport = async (path: string) => {
-    return (await fetch(path)).text();
-  };
 
   requester = async <R, V>(
     doc: DocumentNode,
@@ -64,15 +59,16 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
     context = context ?? this.defaultContext;
     try {
       let typeDefs;
-      if (!this.schema) {
+      if (!this.schema && this.schemaAssetPath) {
         // Dynamic import of schema
-        const generatedSdkFile = await this.dynImport(this.schemaPath!);
-        console.log(URI_SDX_GENERATE_SDK_DYNAMIC_IMPORT_PATH);
-        console.log(generatedSdkFile);
-        // typeDefs = generatedSdkFile['GRAPHQL_SCHEMA'];
-        typeDefs = generatedSdkFile;
-      } else {
+        const schema = await (await fetch(this.schemaAssetPath)).text();
+        typeDefs = schema;
+      } else if (this.schema) {
         typeDefs = this.schema;
+      } else {
+        throw new Error(
+          'No schema found. Use schema or schemaAssetPath as SolidLDPBackendOptions options.'
+        );
       }
       const query = print(doc);
       const schema = makeExecutableSchema({ typeDefs });
