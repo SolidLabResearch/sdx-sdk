@@ -29,12 +29,14 @@ export class SolidLDPContext implements SolidTargetBackendContext {
 
 export interface SolidLDPBackendOptions {
   schema?: string;
+  schemaPath?: string;
   clientCredentials?: SolidClientCredentials;
   defaultContext?: SolidLDPContext;
 }
 
 export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
   private schema?: string;
+  private schemaPath?: string;
   private defaultContext?: SolidLDPContext;
   private queryHandler: QueryHandler;
   private mutationHandler: MutationHandler;
@@ -42,6 +44,7 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
 
   constructor(options?: SolidLDPBackendOptions) {
     this.schema = options?.schema;
+    this.schemaPath = options?.schemaPath;
     this.defaultContext = options?.defaultContext;
     this.ldpClient = new LdpClient(options?.clientCredentials);
     this.queryHandler = new QueryHandler(this.ldpClient);
@@ -63,9 +66,7 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
       let typeDefs;
       if (!this.schema) {
         // Dynamic import of schema
-        const generatedSdkFile = await this.dynImport(
-          URI_SDX_GENERATE_SDK_DYNAMIC_IMPORT_PATH
-        );
+        const generatedSdkFile = await this.dynImport(this.schemaPath!);
         console.log(URI_SDX_GENERATE_SDK_DYNAMIC_IMPORT_PATH);
         console.log(generatedSdkFile);
         typeDefs = generatedSdkFile['GRAPHQL_SCHEMA'];
