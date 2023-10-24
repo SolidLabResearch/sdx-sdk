@@ -79,7 +79,7 @@ export class SolidLDPBackend implements SolidTargetBackend<SolidLDPContext> {
         contextValue: context,
         fieldResolver: this.fieldResolver
       });
-      return result as R;
+      return result.data as R;
     } catch (err: any) {
       throw new Error(
         'No GRAPHQL_SCHEMA variable found in generated SDK file\n' +
