@@ -63,7 +63,7 @@ describeIf('docker')('Auth', () => {
       schema
     });
 
-    const result = await backend.requester(
+    const result = await backend.rawRequester(
       gql(`query { contactCollection { familyName givenName } }`)
     );
     // console.log(result);

@@ -107,8 +107,8 @@ describe('GQL Schema executes', () => {
   });
 
   it('a query (single)', async () => {
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       getContact,
       {
         id: 'http://example.org/cont/tdupont'
@@ -129,8 +129,8 @@ describe('GQL Schema executes', () => {
   });
 
   it('a query (collection)', async () => {
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       getContacts
     );
     expect(result).not.toBeUndefined();
@@ -162,8 +162,8 @@ describe('GQL Schema executes', () => {
       givenName: 'John',
       familyName: 'Doe'
     };
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       createContact,
       { input }
     );
@@ -180,8 +180,8 @@ describe('GQL Schema executes', () => {
       givenName: 'Thomas',
       familyName: 'Dupont'
     };
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       deleteContact,
       { id: input.id }
     );
@@ -198,8 +198,8 @@ describe('GQL Schema executes', () => {
       givenName: 'Thomas',
       familyName: 'Dupont'
     };
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       flipNames,
       {
         id: input.id,
@@ -229,8 +229,8 @@ describe('GQL Schema executes', () => {
       country: 'Belgium'
     };
     const { id, ...input } = obj;
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       setAddress,
       {
         id,
@@ -256,8 +256,8 @@ describe('GQL Schema executes', () => {
 
   it('a mutation (clear non-scalar)', async () => {
     const id = 'http://example.org/cont/tdupont';
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       clearAddress,
       { id }
     );
@@ -279,8 +279,8 @@ describe('GQL Schema executes', () => {
       id: 'http://example.org/org/extra',
       name: 'Extra'
     };
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       addWorksFor,
       {
         id,
@@ -311,8 +311,8 @@ describe('GQL Schema executes', () => {
   it('a mutation (remove non-scalar)', async () => {
     const id = 'http://example.org/cont/pdemeest';
     const orgId = 'http://example.org/org/idlab';
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       removeWorksFor,
       { id, orgId }
     );
@@ -334,8 +334,8 @@ describe('GQL Schema executes', () => {
   it('a mutation (link [set] non-scalar)', async () => {
     const link = 'http://example.org/addr/work';
     const id = 'http://example.org/cont/tdupont';
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       linkSetAddress,
       {
         id,
@@ -362,8 +362,8 @@ describe('GQL Schema executes', () => {
   it('a mutation (link [add] non-scalar)', async () => {
     const link = 'http://example.org/org/ugent';
     const id = 'http://example.org/cont/tdupont';
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       linkAddWorksFor,
       {
         id,
@@ -394,8 +394,8 @@ describe('GQL Schema executes', () => {
   it('a mutation (unlink [clear] non-scalar)', async () => {
     const id = 'http://example.org/cont/tdupont';
     const link = 'http://example.org/addr/home';
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       unlinkClearAddress,
       { id, link }
     );
@@ -414,8 +414,8 @@ describe('GQL Schema executes', () => {
   it('a mutation (unlink [remove] non-scalar)', async () => {
     const id = 'http://example.org/cont/pdemeest';
     const link = 'http://example.org/org/idlab';
-    const result = await ldpBackend.requester.call(
-      ldpBackend.requester,
+    const result = await ldpBackend.rawRequester.call(
+      ldpBackend.rawRequester,
       unlinkRemoveWorksFor,
       { id, link }
     );
